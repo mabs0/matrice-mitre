@@ -1,24 +1,94 @@
-body { margin: 0; font-family: "Segoe UI", sans-serif; background: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
-#navigator-header { background: #205493; color: white; padding: 10px 20px; display: flex; align-items: center; gap: 20px; }
-.controls select { padding: 5px; min-width: 400px; font-family: monospace; }
+:root { 
+    --primary: #205493; 
+    --success: #2e7d32; 
+    --warn: #ed6c02; 
+    --danger: #d32f2f;
+    --navigator-orange: #ffab40;
+}
 
-#matrix-wrapper { flex-grow: 1; overflow: auto; padding: 10px; }
-#matrix-container { display: flex; gap: 5px; }
+body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
 
-.tactic-column { min-width: 180px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.tactic-header { background: #e2e2e2; padding: 8px; font-weight: bold; text-align: center; border: 1px solid #ccc; font-size: 0.75rem; min-height: 35px; display: flex; align-items: center; justify-content: center; }
+/* NAVIGATION */
+#main-nav { background: #1a1a1a; color: white; display: flex; justify-content: space-between; padding: 10px 25px; align-items: center; z-index: 100; }
+.nav-links button { background: none; border: 1px solid #444; color: white; padding: 7px 15px; cursor: pointer; border-radius: 4px; }
+.nav-links button:hover { background: #333; }
+
+/* LAYOUT MATRICE (RETOUR AU LOOK NAVIGATOR) */
+.view { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+#matrix-wrapper { 
+    flex-grow: 1; 
+    overflow: auto; 
+    padding: 10px; 
+    background: #ffffff; 
+}
+
+#matrix-container { 
+    display: flex; 
+    gap: 4px; 
+    align-items: flex-start; 
+}
+
+.tactic-column { 
+    min-width: 175px; 
+    flex: 1; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 2px; 
+}
+
+.tactic-header { 
+    background: #e0e0e0; 
+    padding: 10px; 
+    font-size: 0.75rem; 
+    font-weight: bold; 
+    text-align: center; 
+    border: 1px solid #ccc; 
+    min-height: 45px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    position: sticky; 
+    top: 0;
+    z-index: 10;
+}
 
 .technique-cell { 
-    background: white; border: 1px solid #ddd; padding: 6px; font-size: 0.7rem; 
-    min-height: 40px; cursor: pointer; transition: all 0.2s; 
+    background: #fff; 
+    border: 1px solid #eee; 
+    padding: 8px; 
+    font-size: 0.7rem; 
+    min-height: 50px; 
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
 }
-.technique-cell:hover { border-color: #205493; background: #f0f4f8; }
-.technique-cell.active { background: #ffab40 !important; font-weight: bold; }
-.technique-cell.inactive { opacity: 0.3; }
 
-/* Modal */
-.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-.modal-content { background: white; margin: 5% auto; padding: 25px; width: 60%; max-height: 80vh; overflow-y: auto; border-radius: 8px; position: relative; line-height: 1.6; }
-.close-btn { position: absolute; right: 20px; top: 15px; font-size: 24px; cursor: pointer; color: #666; }
-.tech-id-label { color: #205493; font-weight: bold; font-family: monospace; }
-h2 { margin-top: 0; color: #333; }
+/* ÉTATS DE SÉLECTION (LE LOOK ORANGE/GRIS) */
+.technique-cell.active { 
+    background: var(--navigator-orange) !important; 
+    border-color: #e68a00;
+    font-weight: bold;
+    color: #000;
+}
+
+.technique-cell.inactive { 
+    opacity: 0.25; 
+}
+
+/* COULEURS DE MATURITÉ (IMPORT/QUIZ) */
+.score-high { background: #c8e6c9 !important; border-left: 5px solid var(--success) !important; }
+.score-med { background: #fff9c4 !important; border-left: 5px solid var(--warn) !important; }
+.score-low { background: #ffcdd2 !important; border-left: 5px solid var(--danger) !important; }
+
+/* MODAL & CARDS */
+.container { max-width: 700px; margin: 40px auto; width: 90%; }
+.card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+.btn-group { display: flex; gap: 10px; margin-top: 15px; }
+button.btn-primary { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+button.btn-excel { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
+.modal-content { background: white; margin: 5% auto; padding: 30px; width: 60%; border-radius: 8px; position: relative; max-height: 80vh; overflow-y: auto; }
+.close-btn { position: absolute; right: 20px; top: 10px; cursor: pointer; font-size: 28px; color: #999; }
+.close-btn:hover { color: #000; }

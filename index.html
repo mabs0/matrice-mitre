@@ -2,31 +2,68 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ATT&CK Matrix Replica</title>
+    <title>CyberShield - MITRE Framework</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-    <div id="navigator-header">
-        <div class="logo">MITRE ATT&CK<sup>&reg;</sup> Navigator Replica</div>
-        <div class="controls">
-            <select id="mitigation-select">
-                <option value="">Chargement des données...</option>
-            </select>
+    <nav id="main-nav">
+        <div class="logo">CyberShield 🛡️</div>
+        <div class="nav-links">
+            <button onclick="showView('view-matrix')">Matrice</button>
+            <button onclick="showView('view-quiz')">Quiz Maturité</button>
+            <button onclick="showView('view-import')">Import/Export</button>
+        </div>
+    </nav>
+
+    <!-- VUE 1 : MATRICE (RETOUR DES COLONNES) -->
+    <section id="view-matrix" class="view">
+        <div id="navigator-header">
+            <select id="mitigation-select"><option>Chargement...</option></select>
             <span id="counter"></span>
         </div>
-    </div>
+        <div id="matrix-wrapper">
+            <div id="matrix-container"></div>
+        </div>
+    </section>
 
-    <div id="matrix-wrapper">
-        <div id="matrix-container"></div>
-    </div>
+    <!-- VUE 2 : QUIZ (DYNAMIQUE) -->
+    <section id="view-quiz" class="view hidden">
+        <div class="container">
+            <div id="quiz-card" class="card">
+                <div id="quiz-step">
+                    <!-- Injecté par JS -->
+                </div>
+            </div>
+        </div>
+    </section>
 
-    <!-- Fenêtre de détails de la technique -->
+    <!-- VUE 3 : IMPORT/EXPORT -->
+    <section id="view-import" class="view hidden">
+        <div class="container">
+            <div class="card">
+                <h3>Exporter les résultats</h3>
+                <p>Sauvegardez votre progression pour une utilisation ultérieure.</p>
+                <input type="password" id="export-pass" placeholder="Clé pour JSON (optionnel)">
+                <div class="btn-group">
+                    <button class="btn-primary" onclick="exportData('json')">Exporter JSON Chiffré</button>
+                    <button class="btn-excel" onclick="exportData('excel')">Exporter en Excel (.xlsx)</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Importer un fichier</h3>
+                <input type="file" id="import-file">
+                <input type="password" id="import-pass" placeholder="Clé de déchiffrement (si JSON)">
+                <button class="btn-primary" onclick="processImport()">Charger les données</button>
+            </div>
+        </div>
+    </section>
+
     <div id="tech-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
-            <div id="modal-body">
-                <!-- Rempli par JS -->
-            </div>
+            <div id="modal-body"></div>
         </div>
     </div>
 
