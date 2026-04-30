@@ -2,28 +2,31 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MITRE ATT&CK Mitigation Navigator</title>
+    <title>ATT&CK Matrix Replica</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>ATT&CK Mitigation Matrix</h1>
-        <div id="status">Chargement des données MITRE en direct...</div>
-    </header>
+    <div id="navigator-header">
+        <div class="logo">MITRE ATT&CK<sup>&reg;</sup> Navigator Replica</div>
+        <div class="controls">
+            <select id="mitigation-select">
+                <option value="">Chargement des données...</option>
+            </select>
+            <span id="counter"></span>
+        </div>
+    </div>
 
-    <main id="matrix-container">
-        <!-- La matrice sera générée ici -->
-    </main>
+    <div id="matrix-wrapper">
+        <div id="matrix-container"></div>
+    </div>
 
-    <!-- Modal pour afficher les techniques -->
-    <div id="modal" class="hidden">
+    <!-- Fenêtre de détails de la technique -->
+    <div id="tech-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
-            <h2 id="modal-title"></h2>
-            <p id="modal-description"></p>
-            <h3>Techniques associées :</h3>
-            <ul id="techniques-list"></ul>
+            <div id="modal-body">
+                <!-- Rempli par JS -->
+            </div>
         </div>
     </div>
 
