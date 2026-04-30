@@ -2,19 +2,35 @@ const JSON_URL = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-
 
 let tactics = [], techniques = [], mitigations = [], relationships = [];
 
+// On attend que le HTML soit chargé avant de lancer le JS
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+});
+
 async function loadData() {
+    // Petit indicateur de chargement dans le select
+    const select = document.getElementById('mitigation-select');
+    if (select) select.innerHTML = '<option>Chargement du MITRE ATT&CK...</option>';
+
     try {
         const resp = await fetch(JSON_URL);
+        if (!resp.ok) throw new Error("Erreur lors de la récupération du JSON");
+        
         const data = await resp.json();
         const objects = data.objects;
 
+        // Filtrage des données
         tactics = objects.filter(o => o.type === "x-mitre-tactic").sort((a,b) => a.name.localeCompare(b.name));
         techniques = objects.filter(o => o.type === "attack-pattern" && !o.x_mitre_is_subtechnique);
         mitigations = objects.filter(o => o.type === "course-of-action" && !o.x_mitre_deprecated);
         relationships = objects.filter(o => o.type === "relationship" && o.relationship_type === "mitigates");
 
         initInterface();
-    } catch (e) { console.error("Erreur de chargement", e); }
+    } catch (e) {
+        console.error("Détails de l'erreur:", e);
+        // Si l'élément select existe, on y affiche l'erreur
+        if (select) select.innerHTML = `<option>Erreur de chargement : ${e.message}</option>`;
+    }
 }
 
 function getExtId(obj) {
