@@ -32,7 +32,10 @@ async function loadData() {
         o.x_mitre_deprecated !== true && o.revoked !== true
     );
     
-    mitigations = allObjects.filter(o => o.type === "course-of-action" && o.x_mitre_deprecated !== true);
+    mitigations = allObjects.filter(o => 
+        o.type === "course-of-action" && o.x_mitre_deprecated !== true && o.revoked !== true
+    );
+    
     relationships = allObjects.filter(o => o.type === "relationship");
 
     initInterface();
@@ -40,13 +43,21 @@ async function loadData() {
 
 function initInterface() {
     const sel = document.getElementById('mitigation-select');
-    sel.innerHTML = '<option value="">Filtrer par Mitigation...</option>';
-    mitigations.sort((a,b) => a.name.localeCompare(b.name)).forEach(m => {
+    sel.innerHTML = '<option value="">Filtrer par Mitigation (Ordre ID)...</option>';
+    
+    // TRI PAR ID CROISSANT
+    mitigations.sort((a, b) => {
+        const idA = a.external_references?.[0]?.external_id || "";
+        const idB = b.external_references?.[0]?.external_id || "";
+        return idA.localeCompare(idB, undefined, { numeric: true });
+    }).forEach(m => {
         let opt = document.createElement('option');
         opt.value = m.id;
-        opt.textContent = `[${m.external_references?.[0]?.external_id || "M"}] ${m.name}`;
+        const mId = m.external_references?.[0]?.external_id || "M";
+        opt.textContent = `[${mId}] ${m.name}`;
         sel.appendChild(opt);
     });
+    
     sel.onchange = (e) => highlightMitigation(e.target.value);
     
     const modal = document.getElementById('tech-modal');
@@ -85,15 +96,24 @@ function renderMatrix() {
 function showTechDetails(tech) {
     const techId = tech.external_references[0].external_id;
     const subTechs = allObjects.filter(o => o.type === "attack-pattern" && o.x_mitre_is_subtechnique === true && o.external_references[0].external_id.startsWith(techId + "."));
+    
     const assocMits = relationships.filter(r => r.relationship_type === "mitigates" && r.target_ref === tech.id)
-        .map(r => allObjects.find(obj => obj.id === r.source_ref)).filter(m => m != null);
+        .map(r => allObjects.find(obj => obj.id === r.source_ref))
+        .filter(m => m != null);
 
     document.getElementById('modal-body').innerHTML = `
         <h3>${techId} - ${tech.name}</h3><hr>
         <div style="font-size:0.8rem; margin-bottom:15px; background:#f9f9f9; padding:10px;">${tech.description || ""}</div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:0.75rem;">
             <div><b>Sous-techniques:</b><ul>${subTechs.map(s => `<li><a href="${s.external_references[0].url}" target="_blank">${s.external_references[0].external_id}</a></li>`).join('') || "Aucune"}</ul></div>
-            <div><b>Mitigations:</b><ul>${assocMits.map(m => `<li>${m.name}</li>`).join('') || "Aucune"}</ul></div>
+            <div><b>Mitigations associées:</b><ul>${assocMits.map(m => {
+                const mId = m.external_references?.[0]?.external_id || "M";
+                const mUrl = m.external_references?.[0]?.url || "#";
+                return `<li><a href="${mUrl}" target="_blank">${mId}: ${m.name}</a></li>`;
+            }).join('') || "Aucune"}</ul></div>
+        </div>
+        <div style="margin-top:20px; text-align:right;">
+            <a href="${tech.external_references[0].url}" target="_blank" class="btn-primary" style="text-decoration:none;">Voir fiche MITRE</a>
         </div>`;
     document.getElementById('tech-modal').style.display = "block";
 }
