@@ -1,12 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>MITRE ATT&CK Mitigation Navigator</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Welcome</h1>
-    <p>This is a simple HTML page.</p>
+    <header>
+        <h1>ATT&CK Mitigation Matrix</h1>
+        <div id="status">Chargement des données MITRE en direct...</div>
+    </header>
+
+    <main id="matrix-container">
+        <!-- La matrice sera générée ici -->
+    </main>
+
+    <!-- Modal pour afficher les techniques -->
+    <div id="modal" class="hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modal-title"></h2>
+            <p id="modal-description"></p>
+            <h3>Techniques associées :</h3>
+            <ul id="techniques-list"></ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
