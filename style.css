@@ -1,48 +1,54 @@
 :root { 
-    --primary: #205493; 
-    --success: #2e7d32; 
-    --warn: #ed6c02; 
-    --danger: #d32f2f;
+    --primary: #205493; --success: #2e7d32; --warn: #ed6c02; --danger: #d32f2f;
     --navigator-orange: #ffab40;
 }
 
 body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #f4f4f4; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-/* NAV */
+/* NAVIGATION */
 #main-nav { background: #1a1a1a; color: white; display: flex; justify-content: space-between; padding: 10px 20px; align-items: center; z-index: 100; }
 .nav-links button { background: none; border: 1px solid #444; color: white; padding: 6px 12px; cursor: pointer; border-radius: 4px; font-size: 0.8rem; }
-.nav-links button:hover { background: #333; }
 
-/* MATRIX LAYOUT */
+/* MATRICE COMPACTE */
 .view { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
 .hidden { display: none !important; }
-
 #matrix-wrapper { flex-grow: 1; overflow: auto; padding: 5px; background: #fff; }
 #matrix-container { display: flex; gap: 2px; align-items: flex-start; }
 
 .tactic-column { min-width: 135px; flex: 1; display: flex; flex-direction: column; gap: 1px; }
-
 .tactic-header { 
     background: #e0e0e0; padding: 6px; font-size: 0.65rem; font-weight: bold; text-align: center; 
     border: 1px solid #bbb; min-height: 50px; display: flex; flex-direction: column;
     align-items: center; justify-content: center; position: sticky; top: 0; z-index: 10;
 }
-
-.tech-count { font-size: 0.55rem; font-weight: normal; color: #555; margin-top: 2px; }
+.tech-count { font-size: 0.55rem; font-weight: normal; color: #555; }
 
 .technique-cell { 
     background: #fff; border: 1px solid #eee; padding: 4px; font-size: 0.6rem; 
-    min-height: 40px; cursor: pointer; line-height: 1.1; transition: background 0.2s;
+    min-height: 40px; cursor: pointer; line-height: 1.1;
 }
-
-/* STATES */
 .technique-cell.active { background: var(--navigator-orange) !important; color: #000; font-weight: bold; }
 .technique-cell.inactive { opacity: 0.2; }
 .score-high { background: #c8e6c9 !important; border-left: 4px solid var(--success) !important; }
 .score-med { background: #fff9c4 !important; border-left: 4px solid var(--warn) !important; }
 .score-low { background: #ffcdd2 !important; border-left: 4px solid var(--danger) !important; }
 
+/* QUIZ STYLISÉ */
+#quiz-step { padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+.quiz-options { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.btn-quiz { 
+    background: #fff; border: 2px solid #ddd; padding: 12px; border-radius: 6px; 
+    cursor: pointer; transition: 0.2s; text-align: left; width: 100%;
+}
+.btn-quiz:hover { border-color: var(--primary); background: #f0f4f8; transform: translateX(5px); }
+
 /* MODAL */
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
-.modal-content { background: white; margin: 5% auto; padding: 25px; width: 50%; border-radius: 8px; position: relative; max-height: 80vh; overflow-y: auto; }
+.modal-content { background: white; margin: 5% auto; padding: 25px; width: 55%; border-radius: 8px; position: relative; max-height: 80vh; overflow-y: auto; }
 .close-btn { position: absolute; right: 20px; top: 10px; cursor: pointer; font-size: 24px; }
+
+/* UTILS */
+.container { max-width: 700px; margin: 40px auto; }
+.card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.btn-primary { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-excel { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }

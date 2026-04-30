@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>CyberShield - MITRE Framework</title>
+    <title>CyberShield - MITRE Matrix Replica</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -12,50 +12,40 @@
         <div class="logo">CyberShield 🛡️</div>
         <div class="nav-links">
             <button onclick="showView('view-matrix')">Matrice</button>
-            <button onclick="showView('view-quiz')">Quiz Maturité</button>
+            <button onclick="showView('view-quiz')">Diagnostic</button>
             <button onclick="showView('view-import')">Import/Export</button>
         </div>
     </nav>
 
-    <!-- VUE 1 : MATRICE (RETOUR DES COLONNES) -->
     <section id="view-matrix" class="view">
         <div id="navigator-header">
             <select id="mitigation-select"><option>Chargement...</option></select>
             <span id="counter"></span>
         </div>
-        <div id="matrix-wrapper">
-            <div id="matrix-container"></div>
-        </div>
+        <div id="matrix-wrapper"><div id="matrix-container"></div></div>
     </section>
 
-    <!-- VUE 2 : QUIZ (DYNAMIQUE) -->
     <section id="view-quiz" class="view hidden">
         <div class="container">
-            <div id="quiz-card" class="card">
-                <div id="quiz-step">
-                    <!-- Injecté par JS -->
-                </div>
-            </div>
+            <div id="quiz-step"></div>
         </div>
     </section>
 
-    <!-- VUE 3 : IMPORT/EXPORT -->
     <section id="view-import" class="view hidden">
         <div class="container">
             <div class="card">
-                <h3>Exporter les résultats</h3>
-                <p>Sauvegardez votre progression pour une utilisation ultérieure.</p>
-                <input type="password" id="export-pass" placeholder="Clé pour JSON (optionnel)">
+                <h3>Exporter</h3>
+                <input type="password" id="export-pass" placeholder="Clé Secrète JSON (Obligatoire)">
                 <div class="btn-group">
-                    <button class="btn-primary" onclick="exportData('json')">Exporter JSON Chiffré</button>
-                    <button class="btn-excel" onclick="exportData('excel')">Exporter en Excel (.xlsx)</button>
+                    <button class="btn-primary" onclick="exportData('json')">JSON Chiffré</button>
+                    <button class="btn-excel" onclick="exportData('excel')">Excel (.xlsx)</button>
                 </div>
             </div>
             <div class="card">
-                <h3>Importer un fichier</h3>
+                <h3>Importer</h3>
                 <input type="file" id="import-file">
-                <input type="password" id="import-pass" placeholder="Clé de déchiffrement (si JSON)">
-                <button class="btn-primary" onclick="processImport()">Charger les données</button>
+                <input type="password" id="import-pass" placeholder="Clé de déchiffrement">
+                <button class="btn-primary" onclick="processImport()">Charger</button>
             </div>
         </div>
     </section>
