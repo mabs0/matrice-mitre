@@ -1,0 +1,6 @@
+# Documents de travail internes (roadmap DIFFUSION RESTREINTE, relecture CLUSIF nominative, sources Excel/Word/PowerPoint)
+docs/
+
+# Fichiers temporaires Office (verrouillage / autosave)
+.~lock.*#
+~$*

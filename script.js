@@ -1,6 +1,6 @@
 const JSON_URL = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json";
 let tactics = [], techniques = [], mitigations = [], relationships = [], allObjects = [];
-let userScores = {}, currentQuizStep = 0;
+let userScores = {};
 
 const TACTIC_ORDER_IDS = {
     "tactic--ffd5bcee-6e16-4eb2-8eca-74c693332024": 1, "tactic--71073099-0604-460d-9e61-f4c079207e8e": 2,
@@ -12,10 +12,40 @@ const TACTIC_ORDER_IDS = {
     "tactic--7464e837-147b-4029-9e8c-55c3c0b0f719": 13, "tactic--77f2cc96-3e01-44a6-9810-74673629f63f": 14
 };
 
-const quizData = [
-    { q: "Avez-vous activé le MFA ?", tech: "T1078", options: [{l:"Oui", v:5}, {l:"Partiel", v:2}, {l:"Non", v:0}] },
-    { q: "Filtrez-vous les emails (Phishing) ?", tech: "T1566", options: [{l:"Oui", v:5}, {l:"Non", v:0}] }
-];
+// Extrait fidèle de docs/Mitigations MITRE ATT&CK v9.xlsx, onglet M1032.
+// G=Niveau visé par la question, H=Preuve documentaire attendue, I=Références.
+const mitigationDemo = {
+    id: "M1032",
+    name: "Multi-factor Authentication",
+    description: "L'authentification multi-facteur (MFA) améliore la sécurité en exigeant que les utilisateurs fournissent au moins deux formes de vérification pour prouver leur identité avant de leur accorder l'accès.",
+    bareme: [
+        "Aucun mécanisme d'authentification à plusieurs facteurs en place.",
+        "MFA activé de manière ponctuelle, sans politique claire ni cohérence globale.",
+        "MFA appliqué sur des comptes critiques, avec une politique partielle.",
+        "MFA obligatoire sur tous les comptes sensibles, avec processus formalisé et suivi.",
+        "MFA adaptatif et contextuel, géré de façon centralisée, avec revues régulières et audit."
+    ],
+    questions: [
+        { num: 1, level: 1, docRequired: false, references: "ISO 27002 8.2, 8.5, 5.17 ; NIST PR.AC-7, PR.AC-6",
+          text: "Votre organisation applique-t-elle une authentification multi-facteurs (MFA) pour les comptes utilisateurs sensibles (administrateurs, comptes cloud, développeurs, etc.) ?" },
+        { num: 2, level: 2, docRequired: false, references: "ISO 27002 8.3, 8.5 ; NIST PR.AC-5",
+          text: "MFA est-il activé sur tous les services exposés à Internet (VPN, RDP, SaaS, Webmail, etc.) ?" },
+        { num: 3, level: 2, docRequired: true, references: "ISO 27002 5.1, 5.16, 5.17 ; NIST PR.IP-1",
+          text: "Une politique formelle d'authentification incluant le MFA est-elle définie et diffusée ?" },
+        { num: 4, level: 3, docRequired: false, references: "ISO 27002 8.5 ; NIST PR.AC-7",
+          text: "Le MFA repose-t-il sur au moins deux facteurs distincts conformes (ex : OTP + mot de passe, carte à puce, biométrie...) ?" },
+        { num: 5, level: 3, docRequired: false, references: "ISO 27002 8.2, 8.3, 8.4 ; NIST PR.IP-11",
+          text: "Le MFA est-il contextuel ou adaptatif (en fonction du rôle, du lieu, de l'état du terminal, etc.) ?" },
+        { num: 6, level: 4, docRequired: true, references: "ISO 27002 5.36 ; NIST PR.IP-8",
+          text: "L'organisation effectue-t-elle des revues régulières des activations/désactivations MFA ?" },
+        { num: 7, level: 4, docRequired: false, references: "ISO 27002 8.15, 8.16 ; NIST DE.CM-7",
+          text: "Des alertes sont-elles générées en cas d'échec MFA répété ou de contournement ?" }
+    ]
+};
+
+let demoIndex = 0;
+let demoAnswers = {};
+let demoDone = false;
 
 document.addEventListener('DOMContentLoaded', loadData);
 
@@ -118,20 +148,100 @@ function showTechDetails(tech) {
     document.getElementById('tech-modal').style.display = "block";
 }
 
+function computeDemoScore() {
+    let max = 0;
+    mitigationDemo.questions.forEach(q => {
+        if (demoAnswers[q.num] === 'Oui' && q.level > max) max = q.level;
+    });
+    return max;
+}
+
 function renderQuiz() {
     const container = document.getElementById('quiz-step');
-    if(currentQuizStep >= quizData.length) {
-        container.innerHTML = "<h3>Quiz terminé !</h3><button class='btn-primary' onclick='showView(\"view-matrix\")'>Voir Matrice</button>";
+    const total = mitigationDemo.questions.length;
+
+    if (demoDone) {
+        const score = computeDemoScore();
+        container.innerHTML = `
+            <div class="quiz-result level-${score}">
+                <div class="quiz-tag">${mitigationDemo.id} — TEST</div>
+                <div class="result-badge">Niveau ${score}</div>
+                <h3>${mitigationDemo.name}</h3>
+                <p class="result-text">${mitigationDemo.bareme[score]}</p>
+                <div class="level-track">${renderLevelTrack(score)}</div>
+                <div class="result-actions">
+                    <button class="btn-quiz-secondary" onclick="restartDemo()">↺ Recommencer le test</button>
+                    <button class="btn-primary" onclick="showView('view-matrix')">Voir la matrice</button>
+                </div>
+            </div>`;
         return;
     }
-    const q = quizData[currentQuizStep];
-    container.innerHTML = `<h4>Question ${currentQuizStep + 1}</h4><p>${q.q}</p><div class="quiz-options"></div>`;
-    q.options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.className = "btn-quiz"; btn.innerText = opt.l;
-        btn.onclick = () => { userScores[q.tech] = opt.v; currentQuizStep++; renderQuiz(); renderMatrix(); };
-        container.querySelector('.quiz-options').appendChild(btn);
-    });
+
+    const q = mitigationDemo.questions[demoIndex];
+    const pct = Math.round((demoIndex / total) * 100);
+    const answered = demoAnswers[q.num];
+
+    container.innerHTML = `
+        <div class="quiz-shell">
+            <div class="quiz-topbar">
+                <div class="quiz-tag">${mitigationDemo.id} — TEST</div>
+                <h2 class="quiz-title">${mitigationDemo.name}</h2>
+                <p class="quiz-desc">${mitigationDemo.description}</p>
+            </div>
+
+            <div class="level-track">${renderLevelTrack(computeDemoScore())}</div>
+
+            <div class="quiz-progress-wrap">
+                <div class="quiz-progress-label">Question ${demoIndex + 1} / ${total}</div>
+                <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+            </div>
+
+            <div class="quiz-card level-${q.level}">
+                <div class="quiz-card-level">Niveau visé : <b>${q.level}</b>${q.docRequired ? ' · <span class="doc-flag">📄 preuve documentaire attendue</span>' : ''}</div>
+                <p class="quiz-question">${q.text}</p>
+                <div class="quiz-answers">
+                    <button class="quiz-answer yes ${answered === 'Oui' ? 'selected' : ''}" onclick="answerDemo('Oui')">✔ Oui</button>
+                    <button class="quiz-answer no ${answered === 'Non' ? 'selected' : ''}" onclick="answerDemo('Non')">✘ Non</button>
+                    <button class="quiz-answer na ${answered === 'N/A' ? 'selected' : ''}" onclick="answerDemo('N/A')">– N/A</button>
+                </div>
+                <div class="quiz-refs">Réf. ${q.references}</div>
+            </div>
+
+            <div class="quiz-nav">
+                <button class="quiz-back" ${demoIndex === 0 ? 'disabled' : ''} onclick="goBackDemo()">← Précédent</button>
+            </div>
+        </div>`;
+}
+
+function renderLevelTrack(currentLevel) {
+    const labels = ["Inexistant", "Informel", "Répétable", "Défini", "Maîtrisé"];
+    let html = '';
+    for (let i = 0; i <= 4; i++) {
+        const state = i < currentLevel ? 'done' : i === currentLevel ? 'active' : '';
+        html += `<div class="level-dot lvl${i} ${state}" title="${labels[i]}">${i}</div>`;
+    }
+    return html;
+}
+
+function answerDemo(val) {
+    const q = mitigationDemo.questions[demoIndex];
+    demoAnswers[q.num] = val;
+
+    if (val === 'Non') { demoDone = true; renderQuiz(); return; }
+
+    if (demoIndex + 1 >= mitigationDemo.questions.length) { demoDone = true; renderQuiz(); return; }
+
+    demoIndex++;
+    renderQuiz();
+}
+
+function goBackDemo() {
+    if (demoIndex > 0) { demoIndex--; renderQuiz(); }
+}
+
+function restartDemo() {
+    demoIndex = 0; demoAnswers = {}; demoDone = false;
+    renderQuiz();
 }
 
 function exportData(type) {
