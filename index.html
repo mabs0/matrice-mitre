@@ -2,61 +2,109 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>CyberShield - MITRE Matrix Replica</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CTRM — Diagnostic de maturité cyber sur MITRE ATT&amp;CK</title>
+    <meta name="description" content="Outil de diagnostic de la maturité cyber d'une organisation, fondé sur les mesures d'atténuation du framework MITRE ATT&amp;CK Enterprise.">
+
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/matrix.css">
+    <link rel="stylesheet" href="css/quiz.css">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-    <nav id="main-nav">
-        <div class="logo">CyberShield 🛡️</div>
-        <div class="nav-links">
-            <button onclick="showView('view-matrix')">Matrice</button>
-            <button onclick="showView('view-quiz')">Diagnostic</button>
-            <button onclick="showView('view-import')">Import/Export</button>
-        </div>
-    </nav>
-
-    <section id="view-matrix" class="view">
-        <div id="navigator-header">
-            <select id="mitigation-select"><option>Chargement...</option></select>
-            <span id="counter"></span>
-        </div>
-        <div id="matrix-wrapper"><div id="matrix-container"></div></div>
-    </section>
-
-    <section id="view-quiz" class="view hidden">
-        <div class="container">
-            <div id="quiz-step"></div>
-        </div>
-    </section>
-
-    <section id="view-import" class="view hidden">
-        <div class="container">
-            <div class="card">
-                <h3>Exporter</h3>
-                <input type="password" id="export-pass" placeholder="Clé Secrète JSON (Obligatoire)">
-                <div class="btn-group">
-                    <button class="btn-primary" onclick="exportData('json')">JSON Chiffré</button>
-                    <button class="btn-excel" onclick="exportData('excel')">Excel (.xlsx)</button>
-                </div>
-            </div>
-            <div class="card">
-                <h3>Importer</h3>
-                <input type="file" id="import-file">
-                <input type="password" id="import-pass" placeholder="Clé de déchiffrement">
-                <button class="btn-primary" onclick="processImport()">Charger</button>
-            </div>
-        </div>
-    </section>
-
-    <div id="tech-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <div id="modal-body"></div>
-        </div>
+    <!-- Écran de chargement : les données ATT&CK sont relues à chaque visite. -->
+    <div id="boot">
+        <h1>Chargement de la matrice MITRE ATT&amp;CK</h1>
+        <div class="bar" id="boot-bar"><span></span></div>
+        <p class="pct" id="boot-pct"></p>
+        <p class="sub" id="boot-status">Initialisation…</p>
+        <p class="sub" style="font-size:0.72rem;color:var(--text-mute);">
+            La version publiée par MITRE est vérifiée à chaque chargement, pour que la
+            matrice soit toujours à jour. Le premier chargement transfère environ 9 Mo ;
+            les suivants repartent du cache du navigateur, sauf si MITRE a publié une
+            nouvelle version.
+        </p>
     </div>
 
-    <script src="script.js"></script>
+    <!--
+        Diagnostic de démarrage. Script classique volontairement : contrairement à
+        un module ES, il s'exécute même depuis file://, donc il peut expliquer
+        pourquoi le reste ne démarre pas.
+    -->
+    <script>
+    (function () {
+        var boot = document.getElementById("boot");
+        var showProblem = function (title, detail, fix) {
+            boot.innerHTML = "<h1>" + title + "</h1>"
+                + (detail ? '<p class="err">' + detail + "</p>" : "")
+                + (fix ? '<p class="fix">' + fix + "</p>" : "");
+        };
+
+        if (location.protocol === "file:") {
+            showProblem(
+                "Il faut servir la page, pas l'ouvrir",
+                "Ouvert en <code>file://</code>, le navigateur refuse de charger les modules "
+                + "JavaScript de l'application : leur chargement est soumis à la politique "
+                + "d'origine, et un fichier local n'a pas d'origine. Firefox comme Chrome se "
+                + "comportent ainsi.",
+                "Depuis le dossier du projet, lancez un serveur local puis ouvrez "
+                + "<code>http://localhost:8000</code> :<br><code>python3 -m http.server 8000</code>"
+                + "<br><br>C'est ce que fait l'extension Live Server de VS Code, et c'est "
+                + "aussi ainsi que GitHub Pages sert le site — en ligne, rien à faire."
+            );
+            return;
+        }
+
+        var failure = null;
+        window.addEventListener("error", function (e) {
+            if (e.target && e.target.tagName === "SCRIPT") failure = "Script non chargé : " + e.target.src;
+            else if (e.message) failure = e.message;
+        }, true);
+
+        // Si l'application n'a pas démarré au bout de 25 s, on affiche ce qu'on sait
+        // plutôt que de laisser tourner la barre indéfiniment.
+        setTimeout(function () {
+            if (window.__ctrmBooted || !document.getElementById("boot")) return;
+            showProblem(
+                "Le démarrage n'aboutit pas",
+                failure || "Aucune erreur JavaScript remontée : le transfert des données ATT&amp;CK "
+                    + "est probablement encore en cours ou bloqué.",
+                "Ouvrez la console du navigateur (F12) et envoyez le message d'erreur. "
+                + "Vérifiez aussi qu'un filtrage réseau ne bloque pas "
+                + "<code>raw.githubusercontent.com</code>."
+            );
+        }, 25000);
+    })();
+    </script>
+
+    <header id="topbar">
+        <button class="brand" id="brand" title="Retour à l'accueil">
+            CTRM <small>maturité cyber</small>
+        </button>
+
+        <div id="layer-tabs"></div>
+
+        <span class="version-badge hidden" id="version-badge">
+            <i class="dot"></i><span id="version-text"></span>
+        </span>
+
+        <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Basculer clair / sombre"
+                aria-label="Basculer entre le thème clair et le thème sombre">☀</button>
+    </header>
+
+    <main id="views" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column;">
+        <section id="view-home" class="view scrollable"></section>
+        <section id="view-matrix" class="view hidden"></section>
+        <section id="view-quiz" class="view hidden"></section>
+    </main>
+
+    <div class="modal" id="modal"><div class="modal-panel" id="modal-panel"></div></div>
+    <div id="toasts"></div>
+
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

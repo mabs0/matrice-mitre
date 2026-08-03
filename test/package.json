@@ -1,0 +1,14 @@
+{
+  "name": "ctrm-test",
+  "private": true,
+  "type": "module",
+  "description": "Banc d'essai headless. Dépendances de développement uniquement : le site lui-même n'a aucune dépendance npm et se sert tel quel sur GitHub Pages.",
+  "scripts": {
+    "test": "node harness.mjs"
+  },
+  "devDependencies": {
+    "crypto-js": "^4.2.0",
+    "jsdom": "^26.0.0",
+    "xlsx": "^0.18.5"
+  }
+}

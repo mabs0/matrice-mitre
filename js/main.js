@@ -1,0 +1,177 @@
+/* ============================================================================
+   Point d'entrée : chargement des données, coquille, routage entre les vues.
+   ========================================================================= */
+
+import { loadAttack } from "./attack.js";
+import { initTheme, toggleTheme, current as currentTheme } from "./theme.js";
+import { esc, $, toast, initModal, initDropdowns } from "./ui.js";
+import { progress } from "./layer.js";
+import { renderHome } from "./views/home.js";
+import { renderMatrix, repaintMatrix, resetMatrixView } from "./views/matrix.js";
+import { renderQuiz, resetQuiz } from "./views/quiz.js";
+
+const app = {
+    data: null,
+    layer: null,
+
+    /** Installe un layer neuf ou importé : l'état de parcours des vues repart de zéro. */
+    setLayer(layer) {
+        this.layer = layer;
+        resetQuiz();
+        resetMatrixView();
+        this.onLayerChange();
+    },
+
+    onLayerChange() {
+        renderTabs();
+        repaintMatrix(this);
+    },
+
+    /** Affiche une vue. `matrix` et `quiz` exigent un layer. */
+    show(name, options = {}) {
+        if (name !== "home" && !this.layer) { this.show("home"); return; }
+
+        for (const view of ["home", "matrix", "quiz"]) {
+            $(`#view-${view}`).classList.toggle("hidden", view !== name);
+        }
+
+        if (name === "home") renderHome(this);
+        if (name === "matrix") renderMatrix(this);
+        if (name === "quiz") renderQuiz(this, options);
+
+        this.view = name;
+        renderTabs();
+    },
+};
+
+/* ------------------------------------------------------------- onglet layer */
+
+function renderTabs() {
+    const host = $("#layer-tabs");
+    if (!host) return;
+
+    if (!app.layer) { host.innerHTML = ""; return; }
+
+    const state = progress(app.layer);
+    host.innerHTML = `
+        <button class="layer-tab current" id="tab-layer"
+                title="Renommer le layer — ${state.completeMitigations} mitigation(s) traitée(s) sur ${state.mitigations}, ${state.answered} question(s) répondue(s)">
+            <span class="name">${esc(app.layer.name)}</span>
+            <span class="pct">${state.completeMitigations}/${state.mitigations}</span>
+        </button>
+        <button class="btn btn-ghost btn-icon" id="tab-close" title="Fermer le layer et revenir à l'accueil">×</button>`;
+
+    $("#tab-layer").onclick = () => {
+        const name = window.prompt("Nom du layer", app.layer.name);
+        if (name?.trim()) { app.layer.name = name.trim(); renderTabs(); }
+    };
+    $("#tab-close").onclick = () => leaveLayer(app);
+}
+
+/**
+ * Quitte le layer courant et revient à l'accueil.
+ * Rien n'étant stocké, on confirme dès qu'il y a des réponses à perdre.
+ * @returns {boolean} vrai si on a effectivement quitté
+ */
+function leaveLayer(app) {
+    if (!app.layer) { app.show("home"); return true; }
+
+    const state = progress(app.layer);
+    if (state.answered > 0) {
+        const message =
+            `Quitter « ${app.layer.name} » et revenir à l'accueil ?\n\n` +
+            `${state.answered} réponse${state.answered > 1 ? "s" : ""} ` +
+            `(${state.completeMitigations}/${state.mitigations} mitigation${state.mitigations > 1 ? "s" : ""} traitée${state.completeMitigations > 1 ? "s" : ""}) ` +
+            `seront perdues, ainsi que la matrice.\n\n` +
+            `Rien n'est enregistré par le navigateur : seul un export permet de reprendre plus tard.`;
+        if (!window.confirm(message)) return false;
+    }
+
+    app.layer = null;
+    resetQuiz();
+    resetMatrixView();
+    app.show("home");
+    return true;
+}
+
+/* ----------------------------------------------------------------- démarrage */
+
+async function boot() {
+    initTheme();
+    initModal();
+    initDropdowns();
+
+    const themeToggle = $("#theme-toggle");
+    if (themeToggle) {
+        themeToggle.onclick = () => { themeToggle.textContent = toggleTheme() === "dark" ? "☀" : "☾"; };
+        themeToggle.textContent = currentTheme() === "dark" ? "☀" : "☾";
+    }
+    const brand = $("#brand");
+    if (brand) brand.onclick = () => leaveLayer(app);
+
+    // Vu par le diagnostic de démarrage d'index.html : les modules se chargent.
+    window.__ctrmBooted = true;
+
+    /**
+     * Rend compte de l'avancement. Chaque élément est optionnel : un défaut
+     * d'affichage ne doit jamais faire échouer le chargement des données, ni se
+     * faire passer pour une panne réseau.
+     */
+    const report = (msg, ratio) => {
+        const status = $("#boot-status");
+        if (status) status.textContent = msg;
+        if (ratio === undefined) return;
+
+        const percent = Math.round(ratio * 100);
+        const bar = $("#boot-bar");
+        if (bar) {
+            bar.classList.add("determinate");
+            if (bar.firstElementChild) bar.firstElementChild.style.width = `${percent}%`;
+        }
+        const pct = $("#boot-pct");
+        if (pct) pct.textContent = `${percent} %`;
+    };
+
+    try {
+        app.data = await loadAttack(report);
+    } catch (err) {
+        // On ne présume pas de la cause : un problème réseau et un défaut de
+        // l'application donnent deux écrans différents.
+        const networkish = /HTTP \d|Failed to fetch|NetworkError|index\.json|bundle/i.test(err.message);
+        $("#boot").innerHTML = `
+            <h1>Chargement impossible</h1>
+            <p class="err">${esc(err.message)}</p>
+            <p class="fix">${networkish
+                ? `Les données sont relues chez MITRE à chaque chargement : vérifiez la connexion
+                   et qu'un filtrage réseau ne bloque pas <code>raw.githubusercontent.com</code>.`
+                : `Cette erreur ne vient pas du réseau. Le plus souvent, c'est un
+                   <code>index.html</code> encore en cache avec des scripts déjà rechargés :
+                   forcez le rechargement avec <b>Ctrl+Maj+R</b>. Si le message persiste,
+                   envoyez-le tel quel.`}</p>
+            <button class="btn btn-primary" onclick="location.reload(true)">Réessayer</button>`;
+        console.error(err);
+        return;
+    }
+
+    const versionText = $("#version-text");
+    const versionBadge = $("#version-badge");
+    if (versionText) versionText.innerHTML = `ATT&amp;CK Enterprise <b>v${esc(app.data.version)}</b>`;
+    if (versionBadge) {
+        versionBadge.title =
+            `Publiée le ${new Date(app.data.modified).toLocaleDateString("fr-FR")} · relue à chaque chargement`;
+        versionBadge.classList.remove("hidden");
+    }
+
+    // Prévient une fermeture accidentelle : rien n'est stocké côté navigateur.
+    window.addEventListener("beforeunload", e => {
+        if (app.layer && progress(app.layer).answered > 0) e.preventDefault();
+    });
+
+    $("#boot")?.remove();
+    app.show("home");
+}
+
+boot().catch(err => {
+    console.error(err);
+    toast(`Erreur inattendue : ${err.message}`, "error");
+});

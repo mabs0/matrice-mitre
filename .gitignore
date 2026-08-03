@@ -4,3 +4,7 @@ docs/
 # Fichiers temporaires Office (verrouillage / autosave)
 .~lock.*#
 ~$*
+
+# Dépendances du banc d'essai (développement uniquement, le site n'en a aucune)
+test/node_modules/
+test/package-lock.json

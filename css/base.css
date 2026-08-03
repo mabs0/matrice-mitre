@@ -1,0 +1,269 @@
+/* Coquille de l'application : reset, barre supérieure, boutons, modale, écran de chargement. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hidden { display: none !important; }
+
+/* ---------------------------------------------------------------- barre haute */
+
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 14px;
+    height: 48px;
+    flex: 0 0 auto;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: 60;
+}
+
+.brand {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    color: var(--text);
+    padding: 0;
+    font-family: inherit;
+}
+.brand small {
+    font-weight: 500;
+    font-size: 0.62rem;
+    color: var(--text-mute);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Onglets de layer, dans l'esprit Tidal Cyber */
+#layer-tabs { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+
+.layer-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 260px;
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+}
+.layer-tab.current { border-color: var(--accent); color: var(--text); background: var(--accent-wash); }
+.layer-tab .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-tab .pct { font-variant-numeric: tabular-nums; font-size: 0.68rem; color: var(--text-mute); }
+.layer-tab.current .pct { color: var(--accent); }
+
+.spacer { flex: 1 1 auto; }
+
+.version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    padding: 4px 9px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.version-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+.version-badge b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------- boutons */
+
+button { font-family: inherit; }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 15px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn:disabled:hover { border-color: var(--border-strong); color: var(--text); }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
+
+.btn-ghost { background: none; border-color: transparent; color: var(--text-dim); }
+.btn-ghost:hover { background: var(--surface-3); color: var(--text); border-color: transparent; }
+
+.btn-icon { padding: 7px 9px; font-size: 0.9rem; line-height: 1; }
+.btn-sm { padding: 5px 10px; font-size: 0.72rem; }
+
+/* --------------------------------------------------------- champs de saisie */
+
+input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 7px 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+label { font-size: 0.74rem; color: var(--text-dim); }
+
+/* --------------------------------------------------------------------- vues */
+
+.view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.view.scrollable { overflow-y: auto; }
+
+/* ---------------------------------------------------------------- chargement */
+
+#boot {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: var(--bg);
+    text-align: center;
+    padding: 24px;
+}
+#boot h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+#boot .sub { font-size: 0.8rem; color: var(--text-dim); max-width: 420px; line-height: 1.5; }
+#boot .bar { width: min(340px, 82vw); height: 5px; background: var(--surface-3); border-radius: 20px; overflow: hidden; }
+
+/* Indéterminée tant qu'on ne connaît pas la taille à recevoir… */
+#boot .bar span {
+    display: block; height: 100%; width: 30%;
+    background: var(--accent); border-radius: 20px;
+    animation: bootSlide 1.4s ease-in-out infinite;
+}
+/* …puis pilotée par la progression réelle du transfert. */
+#boot .bar.determinate span {
+    animation: none;
+    transition: width 0.2s linear;
+}
+
+#boot .pct {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    min-height: 1em;
+}
+#boot .err { color: var(--danger); font-size: 0.8rem; max-width: 520px; line-height: 1.55; text-align: left; }
+#boot .fix {
+    text-align: left;
+    max-width: 520px;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warn);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+}
+#boot .fix code {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.82rem;
+    padding: 4px 8px;
+}
+
+@keyframes bootSlide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(430%); }
+}
+
+/* -------------------------------------------------------------------- modale */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    display: none;
+    background: rgba(0, 0, 0, 0.62);
+    padding: 5vh 16px;
+    overflow-y: auto;
+}
+.modal.open { display: block; }
+.modal-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    max-width: 720px;
+    margin: 0 auto;
+    position: relative;
+    animation: panelIn 0.18s ease;
+}
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.modal-head { padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
+.modal-body { padding: 18px 22px 22px; }
+.modal-close {
+    position: absolute; top: 12px; right: 12px;
+    background: none; border: 0; color: var(--text-mute);
+    font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
+}
+.modal-close:hover { background: var(--surface-3); color: var(--text); }
+
+/* ------------------------------------------------------------------ toasts */
+
+#toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.toast {
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    box-shadow: var(--shadow);
+    animation: toastIn 0.2s ease;
+}
+.toast.error { border-color: var(--danger); color: var(--danger); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------------ divers */
+
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-radius: 3px; }
+
+.sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}

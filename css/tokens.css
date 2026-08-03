@@ -1,0 +1,144 @@
+/* ============================================================================
+   Jetons de thème.
+   Le thème sombre est la valeur par défaut ; le clair est un jeu de valeurs
+   sélectionné pour sa propre surface, pas une inversion automatique.
+   Les deux portées (media query pour le réglage OS, [data-theme] pour la
+   bascule manuelle) sont déclarées afin que la bascule gagne dans les deux sens.
+   ========================================================================= */
+
+:root {
+    color-scheme: dark;
+
+    /* Surfaces et texte */
+    --bg: #0d0f13;
+    --surface: #12141a;
+    --surface-2: #191d25;
+    --surface-3: #212734;
+    --border: #2a3140;
+    --border-strong: #3a4354;
+    --text: #e8eaf0;
+    --text-dim: #98a1b3;
+    --text-mute: #6b7484;
+
+    --accent: #3987e5;
+    --accent-hover: #5598e7;
+    --accent-ink: #ffffff;
+    --accent-wash: rgba(57, 135, 229, 0.14);
+
+    /* Échelle de maturité : rampe d'état rouge -> vert.
+       La teinte porte le sens (rouge = rien en place, vert = maîtrisé) et la
+       clarté porte l'ordre : sur fond sombre, plus mature = plus lumineux.
+       Mesuré — clarté strictement monotone (ΔL 0.08 par palier, plancher 0.06),
+       encre à 4.90:1 au pire sur son propre fond, fond à 2.59:1 au pire sur la
+       surface. Chaque case imprime son niveau : la couleur ne porte jamais
+       l'information seule. */
+    --lvl0: #a52a24;
+    --lvl0-ink: #ffffff;
+    --lvl1: #af5a08;
+    --lvl1-ink: #ffffff;
+    --lvl2: #b0850e;
+    --lvl2-ink: #0b0b0b;
+    --lvl3: #7eb944;
+    --lvl3-ink: #0b0b0b;
+    --lvl4: #60db89;
+    --lvl4-ink: #0b0b0b;
+
+    /* États non chiffrables */
+    --unscored: transparent;
+    --unscored-ink: var(--text-mute);
+    --nomit-ink: #58616f;
+    --nomit-hatch: rgba(255, 255, 255, 0.045);
+
+    --danger: #e66767;
+    --warn: #fab219;
+    --good: #0ca30c;
+    --find: #9085e9;      /* correspondance de recherche, distincte de la maturité */
+
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --radius: 8px;
+    --radius-sm: 5px;
+
+    --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* --- Thème clair : mêmes rôles, valeurs choisies pour la surface claire.
+       La rampe s'ancre dans l'autre sens — plus mature = plus foncé. --- */
+@media (prefers-color-scheme: light) {
+    :root:where(:not([data-theme="dark"])) {
+        color-scheme: light;
+
+        --bg: #f2f2ef;
+        --surface: #f9f9f7;
+        --surface-2: #ffffff;
+        --surface-3: #efefeb;
+        --border: #dcdcd5;
+        --border-strong: #c3c2b7;
+        --text: #0b0b0b;
+        --text-dim: #52514e;
+        --text-mute: #898781;
+
+        --accent: #2a78d6;
+        --accent-hover: #256abf;
+        --accent-ink: #ffffff;
+        --accent-wash: rgba(42, 120, 214, 0.10);
+
+        /* Sur surface claire l'ordre s'inverse : plus mature = plus foncé.
+           Encre à 5.00:1 au pire sur son propre fond. */
+        --lvl0: #fea195;
+        --lvl0-ink: #0b0b0b;
+        --lvl1: #ef852e;
+        --lvl1-ink: #0b0b0b;
+        --lvl2: #b0850e;
+        --lvl2-ink: #0b0b0b;
+        --lvl3: #568f0b;
+        --lvl3-ink: #0b0b0b;
+        --lvl4: #067138;
+        --lvl4-ink: #ffffff;
+
+        --nomit-ink: #a8a6a0;
+        --nomit-hatch: rgba(11, 11, 11, 0.04);
+
+        --danger: #d03b3b;
+        --find: #4a3aa7;
+        --shadow: 0 8px 28px rgba(11, 11, 11, 0.12);
+    }
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+
+    --bg: #f2f2ef;
+    --surface: #f9f9f7;
+    --surface-2: #ffffff;
+    --surface-3: #efefeb;
+    --border: #dcdcd5;
+    --border-strong: #c3c2b7;
+    --text: #0b0b0b;
+    --text-dim: #52514e;
+    --text-mute: #898781;
+
+    --accent: #2a78d6;
+    --accent-hover: #256abf;
+    --accent-ink: #ffffff;
+    --accent-wash: rgba(42, 120, 214, 0.10);
+
+    /* Sur surface claire l'ordre s'inverse : plus mature = plus foncé.
+       Encre à 5.00:1 au pire sur son propre fond. */
+    --lvl0: #fea195;
+    --lvl0-ink: #0b0b0b;
+    --lvl1: #ef852e;
+    --lvl1-ink: #0b0b0b;
+    --lvl2: #b0850e;
+    --lvl2-ink: #0b0b0b;
+    --lvl3: #568f0b;
+    --lvl3-ink: #0b0b0b;
+    --lvl4: #067138;
+    --lvl4-ink: #ffffff;
+
+    --nomit-ink: #a8a6a0;
+    --nomit-hatch: rgba(11, 11, 11, 0.04);
+
+    --danger: #d03b3b;
+    --find: #4a3aa7;
+    --shadow: 0 8px 28px rgba(11, 11, 11, 0.12);
+}
