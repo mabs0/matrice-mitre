@@ -33,8 +33,12 @@ body {
 
 .brand {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 7px;
+    /* La barre haute fait 48 px : rien n'y passe à la ligne, et la marque ne se
+       laisse pas comprimer par l'onglet du layer. */
+    flex: 0 0 auto;
+    white-space: nowrap;
     font-weight: 700;
     font-size: 0.95rem;
     letter-spacing: -0.01em;
@@ -45,7 +49,11 @@ body {
     padding: 0;
     font-family: inherit;
 }
+.brand-mascot { width: 22px; height: 22px; flex: none; }
+
 .brand small {
+    align-self: flex-end;
+    padding-bottom: 2px;
     font-weight: 500;
     font-size: 0.62rem;
     color: var(--text-mute);
@@ -71,8 +79,16 @@ body {
     font-family: inherit;
 }
 .layer-tab.current { border-color: var(--accent); color: var(--text); background: var(--accent-wash); }
-.layer-tab .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-tab .pct { font-variant-numeric: tabular-nums; font-size: 0.68rem; color: var(--text-mute); }
+/* Même règle que dans la liste des mitigations : c'est le nom qui se tronque, le
+   compteur d'avancement garde sa place. Sans `min-width: 0`, un élément flex ne
+   descend pas sous la largeur de son contenu et pousse ce qui suit. */
+.layer-tab .name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-tab .pct {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.68rem;
+    color: var(--text-mute);
+}
 .layer-tab.current .pct { color: var(--accent); }
 
 .spacer { flex: 1 1 auto; }
@@ -162,6 +178,34 @@ label { font-size: 0.74rem; color: var(--text-dim); }
     padding: 24px;
 }
 #boot h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+
+/* ------------------------------------------------------------------ mascotte
+
+   Le tracé vit dans index.html, référencé par <use>. Ses couleurs viennent d'ici
+   pour suivre le thème, et les tentacules ondulent doucement. */
+
+.m-body { fill: var(--accent); }
+.m-arms { stroke: var(--accent); }
+.m-eye { fill: var(--surface-2); }
+.m-pupil { fill: var(--text); }
+.m-mouth { stroke: var(--accent-ink); opacity: 0.55; }
+
+.boot-mascot { width: 76px; height: 76px; margin-bottom: 2px; }
+.boot-mascot .m-arms { animation: mascot-wave 2.8s ease-in-out infinite; transform-origin: 32px 34px; }
+.boot-mascot { animation: mascot-bob 3.4s ease-in-out infinite; }
+
+@keyframes mascot-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+@keyframes mascot-wave {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.92); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-mascot, .boot-mascot .m-arms { animation: none; }
+}
 #boot .sub { font-size: 0.8rem; color: var(--text-dim); max-width: 420px; line-height: 1.5; }
 #boot .bar { width: min(340px, 82vw); height: 5px; background: var(--surface-3); border-radius: 20px; overflow: hidden; }
 
@@ -243,14 +287,30 @@ label { font-size: 0.74rem; color: var(--text-dim); }
 
 /* ------------------------------------------------------------------ toasts */
 
-#toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+#toasts {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    /* Certains messages sont longs — « 6 réponses suivantes effacées… ». Sans
+       bride, ils dépassaient de l'écran sur mobile. */
+    max-width: calc(100vw - 24px);
+}
 .toast {
+    max-width: 100%;
     background: var(--surface-3);
     border: 1px solid var(--border-strong);
     color: var(--text);
     padding: 9px 16px;
     border-radius: 20px;
     font-size: 0.78rem;
+    line-height: 1.45;
+    text-align: center;
     box-shadow: var(--shadow);
     animation: toastIn 0.2s ease;
 }
@@ -266,4 +326,26 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
 .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ------------------------------------------------------------ écrans étroits
+
+   Un seul point de rupture pour la coquille. La barre haute est le point
+   sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. On y
+   retire le sous-titre de la marque et le badge de version — la version est de
+   toute façon rappelée sur l'accueil — pour laisser la place à l'onglet du
+   layer et à la bascule de thème. */
+@media (max-width: 560px) {
+    #topbar { gap: 9px; padding: 0 10px; }
+    .brand small { display: none; }
+    #version-badge { display: none; }
+    .layer-tab { max-width: none; }
+
+    .modal { padding: 3vh 10px; }
+    .modal-head { padding: 16px 16px 12px; }
+    .modal-body { padding: 16px; }
+    .modal-close { top: 8px; right: 8px; }
+
+    #boot { gap: 14px; padding: 20px 16px; }
+    .boot-mascot { width: 62px; height: 62px; }
 }

@@ -35,6 +35,9 @@
     position: fixed;
     z-index: 120;
     min-width: 210px;
+    /* `placePanel` cale le panneau dans la fenêtre, mais ne peut rien contre un
+       panneau plus large qu'elle. */
+    max-width: calc(100vw - 16px);
     max-height: min(330px, calc(100vh - 90px));
     overflow-y: auto;
     padding: 8px;
@@ -284,7 +287,21 @@
     font-size: 0.75rem;
 }
 .mit-row .m-id { font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
-.mit-row .m-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+
+/* C'est le nom qui cède, jamais l'action. Un nom long comme « Restrict File and
+   Directory Permissions » se tronque, et le bouton garde sa taille : sans quoi il
+   se rétrécit sur cette ligne-là et rompt l'alignement de la colonne. Le nom
+   entier reste lisible en infobulle. */
+.mit-row .m-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-dim);
+}
+.mit-row > .btn,
+.mit-row > .tag { flex: 0 0 auto; white-space: nowrap; }
 .mit-row .m-lvl {
     flex: 0 0 auto;
     width: 22px; height: 22px; border-radius: 4px;
@@ -319,7 +336,16 @@
     border-radius: var(--radius-sm);
     margin-bottom: 8px;
 }
-.mit-note .n-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.74rem; }
+/* Ici le nom peut passer à la ligne : il n'y a pas d'action à préserver à droite,
+   et la note a la largeur de la modale. Sans quoi un nom long débordait. */
+.mit-note .n-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-bottom: 6px;
+    font-size: 0.74rem;
+}
 .mit-note .n-head b { font-variant-numeric: tabular-nums; }
 .mit-note .n-bareme { font-size: 0.74rem; color: var(--text-dim); line-height: 1.5; }
 .mit-note .n-desc { font-size: 0.72rem; color: var(--text-mute); line-height: 1.5; margin-top: 6px; }
@@ -329,4 +355,22 @@
 .mit-note .n-tools-label {
     font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--text-mute); margin-right: 2px;
+}
+
+/* ------------------------------------------------------------ écrans étroits
+
+   La grille garde ses colonnes à 146 px et défile horizontalement dans son
+   enveloppe : c'est le comportement voulu, une matrice à quinze tactiques ne se
+   replie pas. Ce qui doit s'adapter, c'est tout ce qui l'entoure. */
+@media (max-width: 560px) {
+    #matrix-toolbar { gap: 7px; padding: 8px 10px; }
+    #matrix-search { width: 150px; }
+    .tool-sep { display: none; }
+
+    /* La légende passe en second plan : sept entrées prennent trop de hauteur
+       sur un petit écran, on ne garde que les cinq niveaux. */
+    .legend-item.aside { display: none; }
+
+    .tech-desc { max-height: 150px; padding: 10px 12px; }
+    .panel-cols { gap: 14px; }
 }

@@ -44,6 +44,27 @@
 }
 .quiz-link b { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
+/* Question commune à plusieurs mitigations : posée une fois, comptée partout.
+   Même traitement visuel que la dépendance ci-dessus, à l'intérieur de la carte
+   de question puisque la mention porte sur la question affichée. */
+.quiz-shared {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin: -4px 0 16px;
+    font-size: 0.71rem;
+    line-height: 1.5;
+    color: var(--text-mute);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--find);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    text-align: left;
+}
+.quiz-shared b { color: var(--text-dim); }
+.quiz-shared-icon { color: var(--find); font-size: 0.85rem; line-height: 1; }
+
 /* --- frise des cinq niveaux, mise à jour en direct --- */
 .level-track { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 22px 0; }
 .level-dot {
@@ -176,6 +197,53 @@
 
 .result-level-name { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-mute); }
 .result-text { color: var(--text-dim); font-size: 0.86rem; line-height: 1.6; max-width: 480px; margin: 12px auto 0; }
-.result-actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
+/* Une seule action mise en avant, à droite ; les échappatoires à gauche. */
+.result-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+.result-secondary { display: flex; gap: 4px; flex-wrap: wrap; margin-right: auto; }
+
+/* Le bouton principal porte son intitulé et sa destination sur deux lignes. */
+.btn-lg {
+    display: grid;
+    gap: 2px;
+    padding: 10px 20px;
+    text-align: left;
+    line-height: 1.25;
+}
+.btn-lg .rn-label { font-size: 0.82rem; font-weight: 600; }
+.btn-lg .rn-target {
+    font-size: 0.69rem;
+    font-weight: 400;
+    opacity: 0.72;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+    .result-actions { flex-direction: column-reverse; align-items: stretch; }
+    .result-secondary { margin-right: 0; justify-content: center; }
+    .btn-lg { justify-items: center; text-align: center; }
+}
+
+@media (max-width: 560px) {
+    .quiz-inner { padding: 26px 16px 44px; }
+    .quiz-card { padding: 18px 16px; }
+    .quiz-question { font-size: 0.94rem; }
+
+    /* Trois réponses côte à côte tiennent jusqu'à environ 300 px de contenu ;
+       en dessous elles passent à la ligne, ce qui reste préférable à des cibles
+       trop petites pour le doigt. */
+    .quiz-answer { min-width: 84px; padding: 13px 8px; }
+
+    .level-track { gap: 5px; margin: 18px 0; }
+    .level-dot { width: 27px; height: 27px; font-size: 0.68rem; }
+    .quiz-nav { flex-wrap: wrap; gap: 8px; }
+}
 
 @keyframes quizFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -9,6 +9,7 @@
 
 import { esc, $, $$, toast, openModal, closeModal } from "../ui.js";
 import { LEVEL_LABELS, LEVEL_DEFINITIONS, getQuestionnaire } from "../catalog.js";
+import { resolvedEntries } from "../shared-questions.js";
 import { buildMatrixScores, mitigationLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
 import { exportExcel, exportJSON } from "../io.js";
 
@@ -121,9 +122,12 @@ function buildLegend() {
              <i class="legend-swatch l${i}"></i>${i} ${esc(label)}</span>`
     ).join("");
 
+    // Les deux états non chiffrables sont marqués `aside` : la légende est
+    // repliée sur les cinq niveaux quand la place manque, et la hachure comme la
+    // surface neutre restent de toute façon explicitées dans la modale.
     $("#matrix-legend").innerHTML = steps +
-        `<span class="legend-item"><i class="legend-swatch unscored"></i>non évalué</span>` +
-        `<span class="legend-item"><i class="legend-swatch nomit"></i>pas de mitigation</span>`;
+        `<span class="legend-item aside"><i class="legend-swatch unscored"></i>non évalué</span>` +
+        `<span class="legend-item aside"><i class="legend-swatch nomit"></i>pas de mitigation</span>`;
 }
 
 /* -------------------------------------------------------- filtre plateforme */
@@ -399,15 +403,17 @@ function openTechnique(app, tech, scores) {
     const mitigationRows = (cell?.mitigations ?? []).map(({ id, level }) => {
         const m = data.mitigationById.get(id);
         if (!m) return "";
-        const available = !!getQuestionnaire(id);
+        // Une mitigation sans question n'est pas évaluable : la catégorie décrit
+        // les cas où l'on choisit de ne pas atténuer, il n'y a pas de maturité.
+        const assessable = (getQuestionnaire(id)?.questions.length ?? 0) > 0;
         return `
             <li class="mit-row">
                 <span class="m-lvl ${level !== null ? `l${Math.round(level)}` : ""}">${level !== null ? formatScore(level) : "—"}</span>
                 <span class="m-id">${esc(id)}</span>
-                <span class="m-name">${esc(m.name)}</span>
-                ${available
+                <span class="m-name" title="${esc(m.name)}">${esc(m.name)}</span>
+                ${assessable
                     ? `<button class="btn btn-sm" data-edit="${esc(id)}">${level !== null ? "Modifier ma réponse" : "Répondre"}</button>`
-                    : `<span class="tag" title="Questionnaire pas encore intégré">à venir</span>`}
+                    : `<span class="tag" title="Cette catégorie décrit les cas où l'on choisit délibérément de ne pas atténuer : il n'y a pas de maturité à mesurer.">rien à évaluer</span>`}
             </li>`;
     }).join("");
 
@@ -419,7 +425,7 @@ function openTechnique(app, tech, scores) {
 
             // Les outils saisis pendant le questionnaire remontent ici : c'est
             // là qu'on veut savoir avec quoi la mitigation est mise en œuvre.
-            const entries = layer.answers[id] || {};
+            const entries = resolvedEntries(layer, id);
             const tools = [...new Set(
                 questionnaire.questions.map(q => entries[q.num]?.tool).filter(Boolean)
             )];

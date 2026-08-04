@@ -16,6 +16,7 @@
     --surface-3: #212734;
     --border: #2a3140;
     --border-strong: #3a4354;
+    --toile: #99a3b4;      /* toile de la rosace : nettement plus claire que les bordures */
     --text: #e8eaf0;
     --text-dim: #98a1b3;
     --text-mute: #6b7484;
@@ -73,6 +74,7 @@
         --surface-3: #efefeb;
         --border: #dcdcd5;
         --border-strong: #c3c2b7;
+        --toile: #96958c;
         --text: #0b0b0b;
         --text-dim: #52514e;
         --text-mute: #898781;
@@ -83,14 +85,19 @@
         --accent-wash: rgba(42, 120, 214, 0.10);
 
         /* Sur surface claire l'ordre s'inverse : plus mature = plus foncé.
-           Encre à 5.00:1 au pire sur son propre fond. */
+           Clarté monotone, écart minimal 0,072, encre à 4,64:1 au pire.
+
+           Le niveau 2 est un ambre franc (teinte 70°) et non un jaune sombre :
+           à cette clarté, le jaune tire à l'olive et salit la surface claire.
+           Le niveau 3 est très légèrement assombri pour rétablir l'écart, qui
+           n'était que de 0,053 — sous le seuil de perception fiable. */
         --lvl0: #fea195;
         --lvl0-ink: #0b0b0b;
         --lvl1: #ef852e;
         --lvl1-ink: #0b0b0b;
-        --lvl2: #b0850e;
+        --lvl2: #c27b00;
         --lvl2-ink: #0b0b0b;
-        --lvl3: #568f0b;
+        --lvl3: #53890c;
         --lvl3-ink: #0b0b0b;
         --lvl4: #067138;
         --lvl4-ink: #ffffff;
@@ -113,6 +120,7 @@
     --surface-3: #efefeb;
     --border: #dcdcd5;
     --border-strong: #c3c2b7;
+    --toile: #96958c;
     --text: #0b0b0b;
     --text-dim: #52514e;
     --text-mute: #898781;
@@ -122,15 +130,15 @@
     --accent-ink: #ffffff;
     --accent-wash: rgba(42, 120, 214, 0.10);
 
-    /* Sur surface claire l'ordre s'inverse : plus mature = plus foncé.
-       Encre à 5.00:1 au pire sur son propre fond. */
+    /* Même rampe claire que ci-dessus : ambre au niveau 2, vert légèrement
+       assombri au niveau 3. Clarté monotone, écart minimal 0,072. */
     --lvl0: #fea195;
     --lvl0-ink: #0b0b0b;
     --lvl1: #ef852e;
     --lvl1-ink: #0b0b0b;
-    --lvl2: #b0850e;
+    --lvl2: #c27b00;
     --lvl2-ink: #0b0b0b;
-    --lvl3: #568f0b;
+    --lvl3: #53890c;
     --lvl3-ink: #0b0b0b;
     --lvl4: #067138;
     --lvl4-ink: #ffffff;

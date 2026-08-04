@@ -38,6 +38,10 @@ export function exportExcel(layer, data) {
 
 /**
  * Lit un fichier de layer : JSON (clair ou chiffré) ou classeur Excel.
+ *
+ * Dans les deux cas il s'agit d'un fichier produit par cet outil : c'est le seul
+ * point d'entrée. Rien ne prétend deviner un autre format.
+ *
  * @param {File} file
  * @param {string} passphrase requise seulement si le JSON est chiffré
  */

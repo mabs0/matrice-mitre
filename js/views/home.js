@@ -9,27 +9,35 @@
    ========================================================================= */
 
 import { esc, $, toast, openModal, closeModal } from "../ui.js";
-import { totalQuestions, CATALOG } from "../catalog.js";
+import { totalQuestions, QUESTIONNAIRES } from "../catalog.js";
+import { savedQuestions } from "../shared-questions.js";
 import { createLayer, nextTarget, progress } from "../layer.js";
 import { readLayerFile, isEncrypted } from "../io.js";
+import { rosace, matrixBackdrop } from "./home-visuals.js";
 
 export function renderHome(app) {
     const { data } = app;
-    const catalogQuestions = totalQuestions();
+    // Les questions communes à plusieurs mitigations ne sont posées qu'une fois :
+    // c'est ce nombre-là qu'il faut annoncer, pas le total du classeur.
+    const catalogQuestions = totalQuestions() - savedQuestions();
 
     $("#view-home").innerHTML = `
+        ${matrixBackdrop(data)}
         <div class="home-inner">
             <div class="home-hero">
-                <span class="home-eyebrow">
-                    MITRE ATT&amp;CK Enterprise <b>v${esc(data.version)}</b> · relu à chaque chargement
-                </span>
-                <h1>Évaluez la <em>maturité cyber</em> de votre organisation<br>sur la matrice MITRE ATT&amp;CK</h1>
-                <p class="home-lead">
-                    L'outil s'appuie sur les ${data.counts.mitigations} mesures d'atténuation d'ATT&amp;CK Enterprise.
-                    Chacune est notée de 0 à 4 sur une échelle inspirée du CMMI et de l'échelle SSI de l'ANSSI,
-                    à partir d'un questionnaire progressif. Le résultat colore la matrice et donne
-                    une cartographie de votre couverture défensive.
-                </p>
+                <div class="hero-text">
+                    <span class="home-eyebrow">
+                        MITRE ATT&amp;CK Enterprise <b>v${esc(data.version)}</b> · relu à chaque chargement
+                    </span>
+                    <h1>Évaluez la <em>maturité cyber</em> de votre organisation<br>sur la matrice MITRE ATT&amp;CK</h1>
+                    <p class="home-lead">
+                        L'outil s'appuie sur les ${data.counts.mitigations} mesures d'atténuation d'ATT&amp;CK Enterprise.
+                        Chacune est notée de 0 à 4 sur une échelle inspirée du CMMI et de l'échelle SSI de l'ANSSI,
+                        à partir d'un questionnaire progressif. Le résultat colore la matrice et donne
+                        une cartographie de votre couverture défensive.
+                    </p>
+                </div>
+                ${rosace()}
             </div>
 
             <div class="home-actions">
@@ -53,41 +61,50 @@ export function renderHome(app) {
                     </p>
                     <div class="drop-zone" id="home-drop">
                         <b>Choisir un fichier</b> ou le déposer ici<br>
-                        JSON de l'outil, ou classeur Excel
+                        un fichier exporté par cet outil, JSON ou Excel
                     </div>
                     <input type="file" id="home-file" class="sr-only" accept=".json,.xlsx,.xls">
                 </div>
             </div>
 
             <div class="home-stats">
-                <div class="stat"><span class="v">${data.counts.tactics}</span><span class="k">tactiques</span></div>
-                <div class="stat"><span class="v">${data.counts.techniques}</span><span class="k">techniques parentes</span></div>
-                <div class="stat"><span class="v">${data.counts.subTechniques}</span><span class="k">sous-techniques</span></div>
                 <div class="stat"><span class="v">${data.counts.mitigations}</span><span class="k">mitigations</span></div>
-                <div class="stat"><span class="v">${data.counts.uncovered}</span><span class="k">techniques sans mitigation</span></div>
+                <div class="stat"><span class="v">${data.counts.techniques}</span><span class="k">techniques</span></div>
+                <div class="stat"><span class="v">${data.counts.subTechniques}</span><span class="k">sous-techniques</span></div>
             </div>
 
-            <div class="home-note">
-                <span>⚠</span>
-                <div>
-                    <b>Rien n'est enregistré par le navigateur.</b>
-                    Un layer vit le temps de la session : pensez à l'exporter avant de fermer l'onglet,
-                    c'est le fichier exporté qui permet de reprendre plus tard.
-                    Le questionnaire couvre pour l'instant
-                    <b>${CATALOG.size} mitigation sur ${data.counts.mitigations}</b>
-                    (${catalogQuestions} questions) — les autres restent grisées dans la matrice.
-                </div>
-            </div>
+            <ol class="home-steps">
+                <li class="step">
+                    <span class="step-num">1</span>
+                    <h3>Questionnaire</h3>
+                    <p>
+                        ${catalogQuestions} questions progressives sur ${QUESTIONNAIRES.size} mitigations.
+                        Un « Oui » fait avancer, un « Non » clôt la mitigation et fixe sa note.
+                    </p>
+                </li>
+                <li class="step">
+                    <span class="step-num">2</span>
+                    <h3>Matrice</h3>
+                    <p>
+                        Les notes remontent sur les ${data.counts.techniques} techniques
+                        d'ATT&amp;CK Enterprise et colorent chaque case de 0 à 4.
+                    </p>
+                </li>
+                <li class="step">
+                    <span class="step-num">3</span>
+                    <h3>Export</h3>
+                    <p>
+                        JSON chiffré ou classeur Excel. C'est ce fichier qui conserve
+                        l'évaluation et permet de la reprendre plus tard.
+                    </p>
+                </li>
+            </ol>
 
             <div class="home-secondary">
                 <button class="btn btn-ghost" id="home-explore">Explorer la matrice sans évaluation →</button>
             </div>
 
-            <p class="home-foot">
-                Données tirées de
-                <a href="https://github.com/mitre-attack/attack-stix-data" target="_blank" rel="noopener">attack-stix-data</a>
-                à chaque chargement · MITRE ATT&amp;CK® est une marque déposée de The MITRE Corporation
-            </p>
+            <p class="home-foot">Données tirées de MITRE ATT&amp;CK</p>
         </div>`;
 
     $("#home-new").onclick = () => promptNewLayer(app);
@@ -124,32 +141,19 @@ export function renderHome(app) {
 /* ------------------------------------------------------- création d'un layer */
 
 function promptNewLayer(app) {
+    // Le modèle du layer porte toujours un répondant et une organisation, et
+    // l'export les reprend : ils ne sont simplement plus demandés au départ.
     openModal(`
         <div class="modal-head">
             <h3 style="margin:0;font-size:1.02rem;">Nouveau layer</h3>
             <p style="margin:6px 0 0;font-size:0.76rem;color:var(--text-dim);line-height:1.5;">
-                Le répondant et l'organisation sont facultatifs, mais ils sont repris dans
-                l'export : ils permettent de savoir qui a répondu, et quand.
+                Un nom pour retrouver cette évaluation dans ses fichiers.
             </p>
         </div>
         <div class="modal-body">
-            <div class="field" style="margin-bottom:14px;">
+            <div class="field">
                 <label for="nl-name">Nom du layer</label>
                 <input type="text" id="nl-name" value="Évaluation ${new Date().getFullYear()}" autocomplete="off">
-            </div>
-            <div class="field-grid">
-                <div class="field">
-                    <label for="nl-resp">Répondant</label>
-                    <input type="text" id="nl-resp" autocomplete="off">
-                </div>
-                <div class="field">
-                    <label for="nl-org">Organisation</label>
-                    <input type="text" id="nl-org" autocomplete="off">
-                </div>
-                <div class="field">
-                    <label for="nl-mail">Courriel</label>
-                    <input type="email" id="nl-mail" autocomplete="off">
-                </div>
             </div>
             <div class="form-actions">
                 <button class="btn" id="nl-cancel">Annuler</button>
@@ -163,11 +167,6 @@ function promptNewLayer(app) {
         const layer = createLayer({
             name: $("#nl-name").value,
             attackVersion: app.data.version,
-            respondent: {
-                name: $("#nl-resp").value.trim(),
-                org: $("#nl-org").value.trim(),
-                email: $("#nl-mail").value.trim(),
-            },
         });
         closeModal();
         app.setLayer(layer);

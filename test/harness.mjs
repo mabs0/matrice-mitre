@@ -54,19 +54,22 @@ const bundle = {
         pat("T1110", "Brute Force", ["credential-access"], ["Windows", "Linux"]),
         pat("T1555", "Credentials from Password Stores", ["credential-access"], ["macOS"]),
         pat("T9999", "Technique sans mitigation", ["initial-access"], ["Linux"]),
-        // Les mitigations du catalogue, plus une sans questionnaire.
+        // Quelques mitigations du catalogue, dont la première, plus celle qui
+        // n'a pas de questionnaire.
+        coa("M1013", "Application Developer Guidance"),   // première du catalogue
         coa("M1016", "Vulnerability Scanning"),
         coa("M1018", "User Account Management"),
         coa("M1027", "Password Policies"),
         coa("M1032", "Multi-factor Authentication"),
         coa("M1049", "Antivirus/Antimalware"),
-        coa("M1030", "Network Segmentation"),        // pas de questionnaire : « à venir »
+        coa("M1055", "Do Not Mitigate"),             // seule mitigation sans questionnaire
         rel("M1032", "T1078"),
         rel("M1018", "T1078"),                       // T1078 couverte par deux mitigations notées
-        rel("M1016", "T1078"),                       // et par la première du catalogue
+        rel("M1016", "T1078"),
+        rel("M1013", "T1078"),                       // et par la première du catalogue
         rel("M1032", "T1110"),
         rel("M1027", "T1110"),
-        rel("M1030", "T1110"),
+        rel("M1055", "T1110"),
         rel("M1032", "T1555.001"),   // cible inexistante : doit être ignorée proprement
     ],
 };
@@ -152,7 +155,11 @@ const stats = [...home.querySelectorAll(".stat .v")].map(n => n.textContent);
 // T9999 n'a aucune relation ; T1555 en a une, mais vers T1555.001 qui n'existe
 // pas dans ce mini-bundle — elle doit être ignorée, donc deux techniques
 // se retrouvent sans mitigation.
-ok("chiffres calculés", stats.join("/") === "2/4/1/6/2", `tactiques/techniques/sous-tech/mitig/sans-mitig = ${stats.join("/")}`);
+ok("chiffres calculés", stats.join("/") === "7/4/1", `mitigations/techniques/sous-techniques = ${stats.join("/")}`);
+ok("l'accueil ne montre plus les tactiques ni les techniques sans mitigation",
+   stats.length === 3 &&
+   !window.document.getElementById("view-home").querySelector(".home-stats")
+       .textContent.match(/tactique|sans mitigation/i));
 ok("relation vers une cible inexistante ignorée",
    window.document.getElementById("view-home").textContent.includes("2"));
 
@@ -191,8 +198,12 @@ for (const cb of window.document.querySelectorAll("#platform-panel input[data-pl
 
 /* -------------------------------------------------------------- questionnaire */
 
-console.log("\n[5] Questionnaire sur les trois mitigations du catalogue");
-const { CATALOG: CAT } = await import(`${ROOT}/js/catalog.js`);
+console.log("\n[5] Questionnaire sur tout le catalogue");
+const { CATALOG: CAT, QUESTIONNAIRES: QST, totalQuestions } =
+    await import(`${ROOT}/js/catalog.js`);
+ok("le catalogue couvre les 44 mitigations du référentiel", CAT.size === 44, CAT.size);
+ok("une seule est sans questionnaire", CAT.size - QST.size === 1,
+   [...CAT.keys()].filter(id => !QST.has(id)).join(","));
 window.document.getElementById("brand").click();
 window.document.getElementById("home-new").click();
 window.document.getElementById("nl-name").value = "Test";
@@ -200,10 +211,10 @@ window.document.getElementById("nl-ok").click();
 
 const openMitigation = () => window.document.querySelector(".quiz-tag")?.textContent.trim();
 ok("on démarre sur la première mitigation du catalogue",
-   openMitigation() === [...CAT.keys()][0], openMitigation());
+   openMitigation() === [...QST.keys()][0], openMitigation());
 
 /** Répond « Oui » partout et enchaîne les mitigations. */
-function answerAllYes(limit = 60) {
+function answerAllYes(limit = totalQuestions() + QST.size + 10) {
     const visited = [];
     for (let i = 0; i < limit; i++) {
         const tag = openMitigation();
@@ -216,15 +227,16 @@ function answerAllYes(limit = 60) {
     return visited;
 }
 const visited = answerAllYes();
-ok("les trois mitigations ont été parcourues", visited.length === CAT.size,
-   visited.join(" → "));
-ok("dans l'ordre du catalogue", visited.join(",") === [...CAT.keys()].join(","), visited.join(","));
+ok(`les ${QST.size} mitigations évaluables ont été parcourues`, visited.length === QST.size,
+   `${visited.length} visitées`);
+ok("dans l'ordre du catalogue, sans passer par celle sans questionnaire",
+   visited.join(",") === [...QST.keys()].join(","));
 
 const badge = window.document.querySelector(".result-badge");
 ok("écran de résultat affiché", !!badge);
 ok("niveau 4 atteint sur la dernière", badge?.textContent.trim() === "4", badge?.textContent.trim());
 ok("l'onglet indique tout traité",
-   window.document.querySelector(".layer-tab .pct")?.textContent === `${CAT.size}/${CAT.size}`,
+   window.document.querySelector(".layer-tab .pct")?.textContent === `${QST.size}/${QST.size}`,
    window.document.querySelector(".layer-tab .pct")?.textContent);
 ok("plus de bouton « Mitigation suivante »", !window.document.getElementById("r-next"));
 
@@ -235,7 +247,7 @@ window.document.getElementById("r-matrix").click();
 const g2 = window.document.getElementById("matrix-grid");
 ok("T1078 (M1032 et M1018, toutes deux à 4) en niveau 4",
    g2.querySelector('[data-tech="T1078"]')?.classList.contains("lvl-4"));
-ok("T1110 (deux notées à 4 + M1030 sans questionnaire) en niveau 4",
+ok("T1110 (deux notées à 4 + une sans questionnaire) en niveau 4",
    g2.querySelector('[data-tech="T1110"]')?.classList.contains("lvl-4"));
 ok("T9999 toujours sans mitigation",
    g2.querySelector('[data-tech="T9999"]')?.classList.contains("no-mitigation"));
@@ -269,9 +281,9 @@ ok("le questionnaire s'ouvre bien sur M1018", openMitigation() === "M1018", open
 window.document.querySelector('[data-answer="Non"]').click();     // M1018 retombe à 0
 window.document.getElementById("r-matrix").click();
 
-// T1078 est couverte par trois mitigations notées ; une seule retombe à 0,
-// donc la moyenne vaut (4 + 0 + 4) / 3 ≈ 2,67, arrondie à 3 pour la couleur.
-ok("moyenne de 4, 0 et 4 : T1078 passe en niveau 3", levelClassOf("T1078") === "lvl-3",
+// T1078 est couverte par quatre mitigations notées ; une seule retombe à 0,
+// donc la moyenne vaut (4 + 4 + 4 + 0) / 4 = 3.
+ok("moyenne de 4, 4, 4 et 0 : T1078 passe en niveau 3", levelClassOf("T1078") === "lvl-3",
    levelClassOf("T1078"));
 setRadio("aggregation", "min");
 ok("minimum : T1078 tombe au niveau 0", levelClassOf("T1078") === "lvl-0", levelClassOf("T1078"));
@@ -291,9 +303,27 @@ ok("les trois mitigations de T1110 sont listées", panel.querySelectorAll(".mit-
    `${panel.querySelectorAll(".mit-row").length} lignes`);
 ok("une note par mitigation notée", panel.querySelectorAll(".mit-note").length === 2,
    `${panel.querySelectorAll(".mit-note").length} notes`);
+
+// Un nom long ne doit pas pousser l'action hors de sa colonne : c'est le nom qui
+// se tronque, et il reste lisible en infobulle.
+{
+    const names = [...panel.querySelectorAll(".mit-row .m-name")];
+    ok("chaque nom de mitigation porte son intitulé complet en infobulle",
+       names.length > 0 && names.every(n => n.getAttribute("title") === n.textContent),
+       names.map(n => n.getAttribute("title")).join(" | "));
+
+    const matrixCss = readFileSync(`${ROOT}/css/matrix.css`, "utf8");
+    const nameRule = /\.mit-row\s+\.m-name\s*\{([^}]*)\}/.exec(matrixCss)?.[1] ?? "";
+    ok("le nom se tronque plutôt que de s'étaler",
+       /min-width:\s*0/.test(nameRule) && /text-overflow:\s*ellipsis/.test(nameRule) &&
+       /white-space:\s*nowrap/.test(nameRule), nameRule.replace(/\s+/g, " ").trim());
+    ok("l'action ne se rétrécit jamais, elle garde l'alignement de la colonne",
+       /\.mit-row\s*>\s*\.btn,\s*\.mit-row\s*>\s*\.tag\s*\{[^}]*flex:\s*0 0 auto/.test(matrixCss));
+}
 ok("bouton « Modifier ma réponse » présent",
    [...panel.querySelectorAll("[data-edit]")].some(b => b.textContent.includes("Modifier")));
-ok("M1030, sans questionnaire, marquée « à venir »", panel.textContent.includes("à venir"));
+ok("la mitigation sans questionnaire est signalée, pas notée",
+   panel.textContent.includes("rien à évaluer"));
 
 /* -------------------------------------------------------- aller-retour fichier */
 
@@ -301,7 +331,9 @@ console.log("\n[9] Aller-retour export / import");
 const { toJSON, fromJSON, toWorkbook, fromWorkbook, progress } = await import(`${ROOT}/js/layer.js`);
 const { buildMatrixScores, mitigationLevels } = await import(`${ROOT}/js/scoring.js`);
 
-const { CATALOG } = await import(`${ROOT}/js/catalog.js`);
+// À partir d'ici, CATALOG désigne le catalogue de travail : les mitigations
+// évaluables, celles que le layer parcourt réellement.
+const { QUESTIONNAIRES: CATALOG } = await import(`${ROOT}/js/catalog.js`);
 const rebuilt = fromJSON(toJSON({
     schema: "ctrm-layer/1", name: "Test", created: "", modified: "", attackVersion: "19.1",
     respondent: { name: "M", org: "O", email: "e" }, scoring: "last-yes", aggregation: "average",
@@ -324,19 +356,26 @@ const back = fromWorkbook(wb, { name: "Relu" });
 ok("Excel relu sans perte", progress(back).answered === 7);
 ok("l'outil survit au passage par Excel", back.answers.M1032[1].tool === "Entra ID");
 
-// Classeur d'origine : réponses en colonne E des onglets M10xx
-const original = XLSXmod.utils.book_new();
-const sheet = XLSXmod.utils.aoa_to_sheet([]);
-XLSXmod.utils.sheet_add_aoa(sheet, [["Numéro", "Question"]], { origin: "A11" });
-XLSXmod.utils.sheet_add_aoa(sheet, [
-    [1, "q1", null, null, "Oui", "Duo"],
-    [2, "q2", null, null, "Non", ""],
-], { origin: "A12" });
-XLSXmod.utils.book_append_sheet(original, sheet, "M1032");
-const fromOriginal = fromWorkbook(original, { name: "Classeur d'origine" });
-ok("classeur d'origine reconnu (colonne E)", progress(fromOriginal).answered === 2,
-   JSON.stringify(fromOriginal.answers.M1032));
-ok("colonne F (Outil) reprise", fromOriginal.answers.M1032[1].tool === "Duo");
+// Un classeur qui n'est pas le nôtre doit être refusé clairement, et non lu au
+// prix de suppositions sur sa disposition de cellules.
+const foreign = XLSXmod.utils.book_new();
+XLSXmod.utils.book_append_sheet(foreign,
+    XLSXmod.utils.aoa_to_sheet([["Numéro", "Question"], [1, "q1"]]), "M1032");
+let refusal = null;
+try { fromWorkbook(foreign, { name: "Étranger" }); } catch (err) { refusal = err.message; }
+ok("un classeur étranger est refusé", refusal !== null, refusal);
+ok("et le message dit ce qui est attendu",
+   /Réponses/.test(refusal ?? "") && /exporté par cet outil/.test(refusal ?? ""), refusal);
+
+// Une feuille « Réponses » présente mais vide de réponses exploitables.
+const emptySheet = XLSXmod.utils.book_new();
+XLSXmod.utils.book_append_sheet(emptySheet,
+    XLSXmod.utils.aoa_to_sheet([["Mitigation", "Numéro", "Réponse"], ["M1032", 1, "Peut-être"]]),
+    "Réponses");
+let emptyError = null;
+try { fromWorkbook(emptySheet, { name: "Vide" }); } catch (err) { emptyError = err.message; }
+ok("une feuille « Réponses » sans réponse valable est signalée",
+   /aucune réponse exploitable/.test(emptyError ?? ""), emptyError);
 
 /* ------------------------------------------------------ JSON chiffré */
 
@@ -573,18 +612,21 @@ ok("la matrice repart vierge",
 /* ------------------------------------------ niveau 0 et progression chiffrée */
 
 console.log("\n[18] Le niveau 0 est atteignable");
-// Aucune des 328 questions du classeur ne vise le niveau 0 : c'est le plancher
+// Aucune des 327 questions du classeur ne vise le niveau 0 : c'est le plancher
 // obtenu quand la première question est « Non », donc sans aucun « Oui ».
 const { mitigationLevel } = await import(`${ROOT}/js/scoring.js`);
 const noQuestionAtZero = [...CATALOG.values()]
     .every(m => m.questions.every(q => q.level !== 0));
 ok("aucune question ne vise le niveau 0", noQuestionAtZero);
 
+// On lit par résolution : si la première question est commune, la réponse est
+// enregistrée chez son porteur et non sous cette mitigation.
+const { resolvedEntries } = await import(`${ROOT}/js/shared-questions.js`);
 for (const id of [...CATALOG.keys()]) {
     const questionnaire = CATALOG.get(id);
     const zero = createLayer({ name: `zéro ${id}` });
     setAnswer(zero, id, questionnaire.questions[0].num, { value: "Non" });
-    const level = mitigationLevel(questionnaire, zero.answers[id], "last-yes");
+    const level = mitigationLevel(questionnaire, resolvedEntries(zero, id), "last-yes");
     ok(`${id} : « Non » à la première question donne le niveau 0`, level === 0, `niveau ${level}`);
 }
 
@@ -685,7 +727,10 @@ const firstNo = { 1: { value: "Non" } };
 ok("aucun ajustement sur un niveau 0", withContribution(firstNo, "Oui") === 0,
    String(withContribution(firstNo, "Oui")));
 
-// Conformité exhaustive à la formule du classeur.
+// Conformité exhaustive à la formule du classeur, sur le domaine que le parcours
+// progressif peut réellement produire : un « Non » clôt le questionnaire, donc
+// aucun état atteignable ne porte de réponse après le premier « Non ». Chaque
+// combinaison est tronquée là, puis comparée à la formule sur ce même état.
 {
     const V = ["Oui", "Non", "N/A"];
     const excel = (own, other) => {
@@ -700,23 +745,46 @@ ok("aucun ajustement sur un niveau 0", withContribution(firstNo, "Oui") === 0,
         if (!n) { yield []; return; }
         for (const rest of combos(n - 1)) for (const v of V) yield [...rest, v];
     }
+    /** Coupe la combinaison au premier « Non » inclus. */
+    const reachable = combo => {
+        const stop = combo.indexOf("Non");
+        return stop < 0 ? combo : combo.slice(0, stop + 1);
+    };
     let checked = 0, diverged = 0;
     for (const combo of combos(m1016.questions.length)) {
+        const kept = reachable(combo);
         for (const other of [...V, null]) {
-            const own = Object.fromEntries(m1016.questions.map((q, i) => [q.num, { value: combo[i] }]));
-            const flat = Object.fromEntries(m1016.questions.map((q, i) => [q.num, combo[i]]));
+            const own = Object.fromEntries(kept.map((v, i) => [m1016.questions[i].num, { value: v }]));
+            const flat = Object.fromEntries(kept.map((v, i) => [m1016.questions[i].num, v]));
             checked++;
             if (Math.abs(withContribution(own, other) - excel(flat, other)) > 1e-9) diverged++;
         }
     }
-    ok(`conforme à la formule du classeur sur ${checked} combinaisons`, diverged === 0,
-       `${diverged} écart(s)`);
+    ok(`conforme à la formule du classeur sur ${checked} combinaisons atteignables`,
+       diverged === 0, `${diverged} écart(s)`);
 }
 
-// Le questionnaire annonce la dépendance.
+// Écart assumé avec le classeur, rendu nécessaire par les questions communes :
+// une réponse subsistant après un « Non » ne compte pas. Elle est conservée en
+// stockage parce qu'une autre mitigation en a besoin, mais la note de celle-ci
+// s'arrête à son propre point de blocage.
+{
+    const afterNo = { 1: { value: "Non" }, 5: { value: "Oui" } };
+    ok("une réponse au-delà d'un « Non » ne relève pas la note",
+       mitigationLevel(m1016, afterNo, "last-yes") === 0,
+       String(mitigationLevel(m1016, afterNo, "last-yes")));
+}
+
+// Le questionnaire annonce la dépendance. On ouvre M1016 depuis la matrice,
+// puisqu'elle n'est plus la première mitigation du catalogue.
 window.document.getElementById("brand").click();
 window.document.getElementById("home-new").click();
 window.document.getElementById("nl-ok").click();
+window.document.getElementById("q-matrix").click();
+window.document.querySelector('[data-tech="T1078"]').click();
+[...window.document.querySelectorAll("#modal-panel [data-edit]")]
+    .find(b => b.dataset.edit === "M1016").click();
+ok("le questionnaire s'est ouvert sur M1016", openMitigation() === "M1016", openMitigation());
 ok("le questionnaire signale la dépendance",
    /M1049/.test(window.document.querySelector(".quiz-link")?.textContent ?? ""),
    window.document.querySelector(".quiz-link")?.textContent.trim());
@@ -799,6 +867,570 @@ ok("« .cell.sub » ne fixe plus d'opacité",
 
 select.value = "";
 select.dispatchEvent(new window.Event("change"));
+
+/* --------------------------------------- questions communes à des mitigations */
+
+console.log("\n[24] Questions communes à plusieurs mitigations");
+const shared = await import(`${ROOT}/js/shared-questions.js`);
+const { SHARED_GROUPS, groupOf, primaryOf, sharedText, sharedWith, savedQuestions } = shared;
+
+// Chaque groupe doit désigner des questions qui existent, et son porteur doit
+// être son premier membre dans l'ordre du catalogue : c'est ce qui rend la
+// remise en ordre à l'import déterministe.
+const catalogOrder = [...CATALOG.keys()];
+{
+    const problems = [];
+    for (const group of SHARED_GROUPS) {
+        if (group.members.length < 2) problems.push(`${group.key} : un seul membre`);
+        for (const m of group.members) {
+            const questionnaire = CATALOG.get(m.mitigation);
+            if (!questionnaire) { problems.push(`${group.key} : ${m.mitigation} hors catalogue`); continue; }
+            if (!questionnaire.questions.some(q => q.num === m.question))
+                problems.push(`${group.key} : ${m.mitigation} Q${m.question} n'existe pas`);
+        }
+        const positions = group.members.map(m => catalogOrder.indexOf(m.mitigation));
+        if (positions.some((p, i) => i > 0 && p <= positions[i - 1]))
+            problems.push(`${group.key} : membres pas dans l'ordre du catalogue`);
+    }
+    ok("les six groupes désignent des questions existantes, porteur en tête",
+       problems.length === 0, problems.join(" | "));
+}
+ok("sept questions économisées", savedQuestions() === 7, String(savedQuestions()));
+ok("320 questions réellement posées", totalQuestions() - savedQuestions() === 320,
+   String(totalQuestions() - savedQuestions()));
+
+// Le trio MFA : trois mitigations, trois niveaux visés, une seule question.
+const mfa = SHARED_GROUPS.find(g => g.key === "mfa-comptes-privilegies");
+ok("le trio MFA compte bien trois membres", mfa.members.length === 3);
+ok("ses membres visent des niveaux différents",
+   mfa.members.map(m => CATALOG.get(m.mitigation).questions.find(q => q.num === m.question).level)
+       .join(",") === "3,2,3");
+
+// On répond depuis le dernier membre : l'écriture doit filer chez le porteur.
+{
+    const l = createLayer({ name: "commun" });
+    setAnswer(l, "M1027", 5, { value: "Oui", tool: "Duo" });
+    ok("la réponse est écrite chez le porteur", l.answers.M1018?.[5]?.value === "Oui",
+       JSON.stringify(l.answers));
+    ok("rien n'est écrit sous la mitigation où l'on a répondu", l.answers.M1027 === undefined);
+
+    for (const id of ["M1018", "M1026", "M1027"]) {
+        ok(`${id} voit la réponse par résolution`,
+           resolvedEntries(l, id)[groupOf(id, id === "M1018" ? 5 : id === "M1026" ? 7 : 5).members
+               .find(m => m.mitigation === id).question]?.value === "Oui");
+    }
+    ok("l'outil saisi suit la réponse partagée", resolvedEntries(l, "M1026")[7]?.tool === "Duo");
+
+    // Chacune applique la réponse à son propre niveau.
+    ok("M1018 monte au niveau 3", mitigationLevel(CATALOG.get("M1018"), resolvedEntries(l, "M1018"), "last-yes") === 3);
+    ok("M1026 monte au niveau 2", mitigationLevel(CATALOG.get("M1026"), resolvedEntries(l, "M1026"), "last-yes") === 2);
+
+    // Et une mitigation notée sans aucune réponse en propre doit apparaître.
+    const levels = mitigationLevels({ ...l, scoring: "last-yes" });
+    ok("M1027 est notée sans réponse en propre", levels.get("M1027") === 3, String(levels.get("M1027")));
+}
+
+// Un « Non » qui clôt une mitigation ne doit pas détruire la réponse commune,
+// qui reste atteignable ailleurs.
+{
+    const l = createLayer({ name: "blocage" });
+    setAnswer(l, "M1018", 5, { value: "Oui" });      // commune, portée par M1018
+    setAnswer(l, "M1018", 7, { value: "Oui" });      // propre à M1018
+    const dropped = setAnswer(l, "M1018", 1, { value: "Non" });
+    ok("la réponse propre postérieure est effacée", dropped === 1 && !l.answers.M1018[7]);
+    ok("la réponse commune est conservée", l.answers.M1018[5]?.value === "Oui");
+    ok("M1018 retombe tout de même à 0",
+       mitigationLevel(CATALOG.get("M1018"), resolvedEntries(l, "M1018"), "last-yes") === 0);
+    ok("M1027 en profite toujours",
+       mitigationLevel(CATALOG.get("M1027"), resolvedEntries(l, "M1027"), "last-yes") === 3);
+}
+
+// À l'import, une réponse restée chez un membre non porteur doit être ramenée,
+// sinon elle masquerait celle du groupe.
+{
+    const imported = fromJSON(JSON.stringify({
+        schema: "ctrm-layer/1", name: "import", answers: {
+            M1026: { 7: { value: "Oui" } },                    // membre non porteur
+            M1050: { 1: { value: "Non" } },                    // membre non porteur
+        },
+    }));
+    ok("la réponse d'un membre non porteur est déplacée",
+       imported.answers.M1018?.[5]?.value === "Oui" && imported.answers.M1026 === undefined,
+       JSON.stringify(imported.answers));
+    ok("elle vaut alors pour tout le groupe", resolvedEntries(imported, "M1027")[5]?.value === "Oui");
+    ok("idem pour la protection mémoire", imported.answers.M1025?.[1]?.value === "Non");
+
+    // Membres en désaccord : le premier déclaré fait foi.
+    const conflict = fromJSON(JSON.stringify({
+        schema: "ctrm-layer/1", name: "conflit", answers: {
+            M1018: { 5: { value: "Oui" } }, M1026: { 7: { value: "Non" } },
+        },
+    }));
+    ok("en cas de désaccord, le porteur fait foi",
+       conflict.answers.M1018[5].value === "Oui" && conflict.answers.M1026 === undefined,
+       JSON.stringify(conflict.answers));
+}
+
+// Une réponse à une question qui n'existe pas ne doit pas entrer dans le layer.
+ok("une réponse hors questionnaire est écartée",
+   fromJSON(JSON.stringify({ schema: "ctrm-layer/1", name: "x",
+       answers: { M1032: { 99: { value: "Oui" } } } })).answers.M1032 === undefined);
+
+// L'export montre la réponse sur chacune des mitigations concernées.
+{
+    const l = createLayer({ name: "export" });
+    setAnswer(l, "M1018", 5, { value: "Oui" });
+    const rows = XLSXmod.utils.sheet_to_json(
+        toWorkbook(l, { mitigations: [], tactics: [], techniques: [] }, new Map(), new Map())
+            .Sheets["Réponses"]);
+    const seen = ["M1018", "M1026", "M1027"].map(id => {
+        const q = groupOf(id, id === "M1026" ? 7 : 5).members.find(m => m.mitigation === id).question;
+        return rows.find(r => r.Mitigation === id && r["Numéro"] === q)?.["Réponse"];
+    });
+    ok("chaque mitigation du groupe porte la réponse dans l'export",
+       seen.join(",") === "Oui,Oui,Oui", seen.join(","));
+}
+
+// Le parcours : la question n'est posée qu'une fois, et une mitigation
+// pré-remplie n'est pas reléguée en fin de première passe.
+{
+    const l = createLayer({ name: "parcours" });
+    setAnswer(l, "M1033", 1, { value: "Oui" });     // pré-remplit M1038 Q1
+    const target = nextTarget(l);
+    ok("la première passe reste dans l'ordre du catalogue", target.mitigation === "M1013",
+       target.mitigation);
+
+    // On avance jusqu'à M1038 : sa première question ne doit pas être reposée.
+    for (const [id, questionnaire] of l.catalog) {
+        if (id === "M1038") break;
+        for (const q of questionnaire.questions) setAnswer(l, id, q.num, { value: "Oui" });
+    }
+    const at1038 = nextTarget(l);
+    ok("M1038 est bien la suivante", at1038.mitigation === "M1038", at1038.mitigation);
+    ok("et on y reprend à la question 2, la première étant déjà connue",
+       at1038.question === 2, String(at1038.question));
+}
+
+// Formulation commune et mention à l'écran.
+ok("une formulation commune est retenue quand les membres diffèrent",
+   sharedText("M1026", 7) === sharedText("M1018", 5) && sharedText("M1026", 7).includes("ou sensibles"));
+ok("aucune formulation imposée quand les membres sont identiques",
+   sharedText("M1033", 1) === null);
+ok("les autres mitigations du groupe sont connues",
+   sharedWith("M1018", 5).join(",") === "M1026,M1027", sharedWith("M1018", 5).join(","));
+ok("M1027 Q2 reste séparée de M1018 Q2", groupOf("M1027", 2) === null);
+
+{
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+    window.document.getElementById("q-matrix").click();
+    window.document.querySelector('[data-tech="T1078"]').click();
+    [...window.document.querySelectorAll("#modal-panel [data-edit]")]
+        .find(b => b.dataset.edit === "M1018").click();
+    for (let i = 0; i < 4; i++) window.document.querySelector('[data-answer="Oui"]').click();
+    const notice = window.document.querySelector(".quiz-shared");
+    ok("le questionnaire signale la question commune", !!notice, notice?.textContent.trim());
+    ok("il nomme les autres mitigations concernées",
+       /M1026/.test(notice?.textContent ?? "") && /M1027/.test(notice?.textContent ?? ""));
+    ok("et affiche la formulation commune",
+       window.document.querySelector(".quiz-question")?.textContent.includes("ou sensibles"));
+}
+
+/* ------------------------------------------- visuels de l'accueil et actions */
+
+console.log("\n[25] Rosace et matrice de fond sur l'accueil");
+window.document.getElementById("brand").click();
+{
+    const home = window.document.getElementById("view-home");
+    // Les mêmes données normalisées que celles servies à l'application.
+    const data = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
+
+    // La toile : un rayon par mitigation, quatre polygones de repère.
+    ok("un rayon par mitigation évaluable",
+       home.querySelectorAll(".ros-spoke").length === QST.size,
+       `${home.querySelectorAll(".ros-spoke").length} rayons pour ${QST.size} mitigations`);
+    ok("quatre polygones de repère, un par palier",
+       home.querySelectorAll(".ros-web").length === 4);
+
+    const dots = home.querySelectorAll(".ros-dot");
+    ok("un sommet par mitigation", dots.length === QST.size, String(dots.length));
+    ok("chaque sommet porte un niveau de 0 à 4",
+       [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
+    ok("chaque sommet nomme sa mitigation au survol",
+       [...dots].every(d => /^M1\d{3} — niveau [0-4]$/.test(d.querySelector("title")?.textContent ?? "")));
+    ok("les sommets apparaissent l'un après l'autre",
+       [...dots].map(d => d.style.getPropertyValue("--i")).join(",")
+           === [...dots].map((_, i) => String(i)).join(","));
+
+    // Le tracé doit relier exactement les sommets, dans le même ordre.
+    const shapePoints = home.querySelector(".ros-shape")?.getAttribute("points").trim().split(/\s+/);
+    ok("le tracé relie tous les sommets", shapePoints?.length === QST.size, String(shapePoints?.length));
+    ok("et passe exactement par eux",
+       shapePoints?.every((p, i) => p === `${dots[i].getAttribute("cx")},${dots[i].getAttribute("cy")}`));
+
+    // Le contour se déroule sur son périmètre : une valeur approchée montrerait
+    // le tracé déjà commencé, ou couperait la fin de l'animation.
+    const shapeEl = home.querySelector(".ros-shape");
+    const closed = shapePoints.map(p => p.split(",").map(Number));
+    const perimeter = closed.reduce((total, [x, y], i) => {
+        const [px, py] = closed[(i + closed.length - 1) % closed.length];
+        return total + Math.hypot(x - px, y - py);
+    }, 0);
+    ok("le déroulé du contour vaut son périmètre exact",
+       Math.abs(Number(shapeEl.style.getPropertyValue("--tour")) - perimeter) < 1,
+       `${shapeEl.style.getPropertyValue("--tour")} pour ${perimeter.toFixed(1)}`);
+
+    // La valeur centrale doit être la moyenne réelle des niveaux affichés.
+    const levels = [...dots].map(d => Number(/l([0-4])/.exec(d.getAttribute("class"))[1]));
+    const mean = (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1).replace(".", ",");
+    ok("la valeur centrale est la moyenne des sommets",
+       home.querySelector(".ros-value")?.textContent === mean,
+       `${home.querySelector(".ros-value")?.textContent} attendu ${mean}`);
+    ok("la rosace est légendée comme un exemple",
+       /Exemple/.test(home.querySelector(".rosace-figure figcaption")?.textContent ?? ""));
+
+    // La matrice de fond reprend la vraie structure du référentiel : une colonne
+    // par tactique, autant de cases que de techniques. C'est cette silhouette
+    // qui la rend reconnaissable.
+    const backdrop = home.querySelector(".home-backdrop");
+    ok("la matrice de fond est présente", !!backdrop);
+    ok("une colonne par tactique, répétée pour composer la trame",
+       home.querySelectorAll(".bd-head").length % data.tactics.length === 0 &&
+       home.querySelectorAll(".bd-head").length >= data.tactics.length,
+       `${home.querySelectorAll(".bd-head").length} en-têtes pour ${data.tactics.length} tactiques`);
+    ok("les en-têtes portent le nom réel des tactiques",
+       [...home.querySelectorAll(".bd-head-text")]
+           .every(t => data.tactics.some(tac => tac.name === t.textContent)),
+       [...home.querySelectorAll(".bd-head-text")].map(t => t.textContent).join(" | "));
+    ok("le nombre de cases suit le nombre réel de techniques",
+       home.querySelectorAll(".bd-cell").length ===
+           2 * data.tactics.reduce((n, t) => n + Math.min(28, data.byTactic.get(t.shortname).length), 0),
+       String(home.querySelectorAll(".bd-cell").length));
+    ok("elle est hors de l'arbre d'accessibilité", backdrop.getAttribute("aria-hidden") === "true");
+    ok("la trame de cases n'existe qu'une fois",
+       home.querySelectorAll("#bd-tiles").length === 1 &&
+       home.querySelectorAll("defs #bd-tiles").length === 1);
+    ok("elle est reprise par des <use>", home.querySelectorAll(".bd-band use").length >= 6);
+    ok("les bandes défilent à des vitesses différentes",
+       new Set([...home.querySelectorAll(".bd-band")]
+           .map(b => b.style.getPropertyValue("--dur"))).size > 1);
+
+    // L'amplitude du défilement doit valoir exactement une trame, sinon la
+    // boucle saute. Le markup la porte, le CSS s'y réfère : pas de doublon.
+    const trame = Number(/(\d+)px/.exec(backdrop.style.getPropertyValue("--trame"))[1]);
+    const copyXs = [...home.querySelectorAll(".bd-band")[0].querySelectorAll("use")]
+        .map(u => Number(u.getAttribute("x")));
+    ok("les copies sont espacées d'exactement une trame",
+       copyXs.every((x, i) => x === i * trame), copyXs.join(", "));
+
+    // Le défaut classique : la bande se vide d'un côté en avançant, et le fond
+    // apparaît. On vérifie la couverture sur toute la plage de l'animation, en
+    // tenant compte de l'écrêtage par le viewport SVG — rien hors de celui-ci
+    // n'est dessiné.
+    const svgWidth = Number(home.querySelector(".home-backdrop svg").getAttribute("width"));
+    const holes = [];
+    for (const band of home.querySelectorAll(".bd-band")) {
+        const xs = [...band.querySelectorAll("use")].map(u => Number(u.getAttribute("x")));
+        const left = Math.max(0, Math.min(...xs));
+        const right = Math.min(svgWidth, Math.max(...xs) + trame);
+        for (const screen of [1280, 1920, 2560, 3840]) {
+            // L'animation translate de −1 trame à 0.
+            for (const t of [-trame, -trame / 2, -1, 0]) {
+                if (left + t > 0 || right + t < screen) holes.push(`${screen}px à t=${t}`);
+            }
+        }
+    }
+    ok("aucun trou dans le défilement, jusqu'au 4K", holes.length === 0, holes.slice(0, 3).join(" | "));
+
+    ok("les bandes sont déphasées, pas décalées géométriquement",
+       new Set([...home.querySelectorAll(".bd-band")]
+           .map(b => b.style.getPropertyValue("--phase"))).size === 3 &&
+       [...home.querySelectorAll(".bd-band")].every(b =>
+           [...b.querySelectorAll("use")].every((u, i) => Number(u.getAttribute("x")) === i * trame)));
+
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    ok("le CSS anime d'une variable, sans redire la géométrie",
+       /translateX\(calc\(-1 \* var\(--trame\)\)\)/.test(homeCss) &&
+       !/translateX\(-?\d+px\)/.test(homeCss));
+    ok("la matrice de fond est écrêtée, pas de débordement de page",
+       /\.home-backdrop\s*\{[^}]*overflow:\s*hidden/.test(homeCss));
+    // On isole le bloc « mouvement réduit » et on regarde ce qu'il contient.
+    const reduced = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
+    ok("toutes les animations se coupent en mouvement réduit",
+       ["\\.bd-band", "\\.ros-web-group", "\\.ros-shape", "\\.ros-dot"]
+           .every(sel => new RegExp(`${sel}[^}]*animation:\\s*none`).test(reduced)),
+       reduced.replace(/\s+/g, " ").trim());
+    ok("l'accueil est positionné pour contenir le fond",
+       /#view-home\s*\{[^}]*position:\s*relative/.test(homeCss));
+
+    /* --- les trois temps du parcours --- */
+    const steps = home.querySelectorAll(".home-steps .step");
+    ok("trois cases expliquent le parcours", steps.length === 3, String(steps.length));
+    ok("dans l'ordre questionnaire, matrice, export",
+       [...steps].map(s => s.querySelector("h3").textContent).join(" → ")
+           === "Questionnaire → Matrice → Export",
+       [...steps].map(s => s.querySelector("h3").textContent).join(" → "));
+    ok("elles sont numérotées",
+       [...steps].map(s => s.querySelector(".step-num").textContent).join("") === "123");
+
+    /* --- ce qui a été retiré --- */
+    ok("plus d'encart sur l'absence d'enregistrement", !home.querySelector(".home-note"));
+    ok("le pied de page se limite à la source",
+       home.querySelector(".home-foot")?.textContent.trim() === "Données tirées de MITRE ATT&CK",
+       home.querySelector(".home-foot")?.textContent.trim());
+    ok("il ne porte plus de lien ni de mention de marque",
+       !home.querySelector(".home-foot a") &&
+       !/marque déposée|attack-stix-data/.test(home.querySelector(".home-foot")?.textContent ?? ""));
+}
+
+console.log("\n[25b] Nouveau layer réduit au nom");
+{
+    window.document.getElementById("home-new").click();
+    const panel = window.document.getElementById("modal-panel");
+    ok("le nom est demandé", !!panel.querySelector("#nl-name"));
+    ok("le répondant ne l'est plus", !panel.querySelector("#nl-resp"));
+    ok("l'organisation non plus", !panel.querySelector("#nl-org"));
+    ok("le courriel non plus", !panel.querySelector("#nl-mail"));
+
+    panel.querySelector("#nl-name").value = "Sans répondant";
+    panel.querySelector("#nl-ok").click();
+    // Le modèle garde la place du répondant : l'export continue de la reprendre.
+    const exported = JSON.parse(toJSON(fromJSON(toJSON({
+        ...createLayer({ name: "Sans répondant" }), catalog: QST,
+    }))));
+    ok("le layer garde un emplacement pour le répondant",
+       exported.respondent && "name" in exported.respondent && "org" in exported.respondent,
+       JSON.stringify(exported.respondent));
+}
+
+console.log("\n[26] Actions de fin de mitigation");
+{
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+
+    // On termine la première mitigation, sans aller plus loin.
+    const first = [...QST.keys()][0];
+    for (let i = 0; i < QST.get(first).questions.length; i++) {
+        window.document.querySelector('[data-answer="Oui"]').click();
+    }
+    ok("l'écran de résultat est atteint", !!window.document.querySelector(".result-badge"));
+
+    const primary = window.document.querySelector(".result-actions .btn-primary");
+    ok("une seule action est mise en avant",
+       window.document.querySelectorAll(".result-actions .btn-primary").length === 1);
+    ok("c'est l'enchaînement, pas la matrice", primary?.id === "r-next", primary?.id);
+    ok("elle annonce la mitigation suivante",
+       primary?.querySelector(".rn-target")?.textContent.startsWith([...QST.keys()][1]),
+       primary?.querySelector(".rn-target")?.textContent);
+    ok("revoir et la matrice restent accessibles, en retrait",
+       !!window.document.querySelector("#r-review.btn-ghost") &&
+       !!window.document.querySelector("#r-matrix.btn-ghost"));
+
+    // Une fois tout traité, plus rien à enchaîner : c'est la matrice qui devient
+    // l'action principale, et elle annonce que le parcours est bouclé.
+    answerAllYes();
+    const last = window.document.querySelector(".result-actions .btn-primary");
+    ok("tout traité : la matrice devient l'action principale", last?.id === "r-matrix", last?.id);
+    ok("et elle le dit", last?.querySelector(".rn-target")?.textContent.includes("Tout est traité"),
+       last?.querySelector(".rn-target")?.textContent);
+    ok("plus de bouton d'enchaînement", !window.document.getElementById("r-next"));
+}
+
+console.log("\n[27] Mention de question commune, forme courte");
+{
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+    window.document.getElementById("q-matrix").click();
+    window.document.querySelector('[data-tech="T1078"]').click();
+    [...window.document.querySelectorAll("#modal-panel [data-edit]")]
+        .find(b => b.dataset.edit === "M1018").click();
+    for (let i = 0; i < 4; i++) window.document.querySelector('[data-answer="Oui"]').click();
+
+    const notice = window.document.querySelector(".quiz-shared");
+    const text = notice?.textContent.replace(/\s+/g, " ").trim() ?? "";
+    ok("la mention nomme les mitigations concernées",
+       /M1026/.test(text) && /M1027/.test(text), text);
+    ok("elle tient en une ligne, sans explication", text.length < 60, `${text.length} caractères`);
+    ok("plus de texte pédagogique", !/posée qu'une fois|niveau que chacune/.test(text));
+}
+
+console.log("\n[28] Rampe de maturité");
+{
+    const tokens = readFileSync(`${ROOT}/css/tokens.css`, "utf8");
+
+    // Le thème clair est déclaré deux fois : réglage système et bascule manuelle.
+    // Les deux doivent porter la même rampe, sans quoi la bascule change les
+    // couleurs de la matrice.
+    const blocks = [
+        /@media\s*\(prefers-color-scheme:\s*light\)\s*\{([\s\S]*?)\n\s*\}\n\}/.exec(tokens)?.[1],
+        /:root\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/.exec(tokens)?.[1],
+    ];
+    ok("les deux déclarations du thème clair sont trouvées", blocks.every(Boolean));
+
+    const rampOf = css => [0, 1, 2, 3, 4]
+        .map(i => new RegExp(`--lvl${i}:\\s*(#[0-9a-f]{6})`).exec(css)?.[1]);
+    const [bySystem, byToggle] = blocks.map(rampOf);
+    ok("réglage système et bascule manuelle portent la même rampe claire",
+       bySystem.join(",") === byToggle.join(","), `${bySystem.join(",")}\n     vs ${byToggle.join(",")}`);
+
+    // Clarté monotone et écarts perceptibles, sur les deux thèmes.
+    const srgbToLin = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const channels = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const lightness = hex => {
+        const [R, G, B] = channels(hex).map(srgbToLin);
+        const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+        const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+        const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+        return 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+    };
+    const relLum = hex => {
+        const [R, G, B] = channels(hex).map(srgbToLin);
+        return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+    };
+    const contrast = (a, b) => {
+        const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+        return (hi + 0.05) / (lo + 0.05);
+    };
+
+    const dark = rampOf(/^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)[1]);
+    for (const [name, ramp, inks] of [
+        ["sombre", dark, [0, 1].map(() => "#ffffff").concat(["#0b0b0b", "#0b0b0b", "#0b0b0b"])],
+        ["clair", bySystem, ["#0b0b0b", "#0b0b0b", "#0b0b0b", "#0b0b0b", "#ffffff"]],
+    ]) {
+        const ls = ramp.map(lightness);
+        const gaps = ls.slice(1).map((l, i) => l - ls[i]);
+        ok(`rampe ${name} : clarté monotone`, new Set(gaps.map(Math.sign)).size === 1,
+           gaps.map(g => g.toFixed(3)).join(" "));
+        ok(`rampe ${name} : écarts de clarté au moins de 0,06`,
+           gaps.every(g => Math.abs(g) >= 0.06),
+           `écart minimal ${Math.min(...gaps.map(Math.abs)).toFixed(3)}`);
+        const inkRatios = ramp.map((c, i) => contrast(c, inks[i]));
+        ok(`rampe ${name} : encre lisible sur chaque palier`,
+           inkRatios.every(r => r >= 4.5),
+           `au pire ${Math.min(...inkRatios).toFixed(2)}:1`);
+    }
+}
+
+console.log("\n[29] Mascotte");
+{
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    ok("le tracé est défini une seule fois, dans un <symbol>",
+       (html.match(/<symbol id="mascot"/g) ?? []).length === 1);
+    ok("il est réutilisé par référence, jamais recopié",
+       (html.match(/<use href="#mascot"\/>/g) ?? []).length >= 2 &&
+       (html.match(/<symbol id="mascot"/g) ?? []).length === 1);
+
+    // Le conteneur du symbole ne doit pas être masqué par display:none : des
+    // navigateurs cessent alors de résoudre les <use>.
+    const holder = /<svg width="0" height="0" style="([^"]*)"/.exec(html)?.[1] ?? "";
+    ok("le conteneur du symbole n'est pas en display:none", !/display:\s*none/.test(holder), holder);
+
+    ok("la mascotte accompagne le chargement", /class="boot-mascot"/.test(html));
+    ok("et sert de logo", /class="brand-mascot"/.test(html));
+    ok("elle est hors de l'arbre d'accessibilité",
+       [...html.matchAll(/<svg class="(boot|brand)-mascot"[^>]*>/g)]
+           .every(m => /aria-hidden="true"/.test(m[0])));
+
+    // Elle est visible dès l'écran de chargement, donc avant tout module : son
+    // tracé doit être dans le HTML, pas généré en JavaScript.
+    const bootBlock = /<div id="boot">([\s\S]*?)<\/div>/.exec(html)?.[1] ?? "";
+    ok("elle est présente avant l'exécution du JavaScript", /#mascot/.test(bootBlock));
+
+    const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
+    ok("ses couleurs suivent le thème",
+       /\.m-body\s*\{\s*fill:\s*var\(--/.test(baseCss) && /\.m-arms\s*\{\s*stroke:\s*var\(--/.test(baseCss));
+    const reducedBase = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/.exec(baseCss)?.[1] ?? "";
+    ok("son animation se coupe en mouvement réduit",
+       /boot-mascot[^}]*animation:\s*none/.test(reducedBase), reducedBase.replace(/\s+/g, " ").trim());
+
+    // Le symbole est bien résolu dans le document rendu.
+    ok("le rendu résout la référence",
+       !!window.document.querySelector('.brand-mascot use[href="#mascot"]') &&
+       !!window.document.querySelector("#mascot .m-body"));
+}
+
+console.log("\n[30] Tenue sur écran étroit");
+{
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    ok("la fenêtre d'affichage est déclarée",
+       /<meta name="viewport" content="width=device-width, initial-scale=1">/.test(html));
+
+    const sheets = ["base", "home", "matrix", "quiz", "tokens"]
+        .map(n => [n, readFileSync(`${ROOT}/css/${n}.css`, "utf8")]);
+
+    /** Retire les blocs @media, pour ne garder que les règles inconditionnelles. */
+    const withoutMedia = css => {
+        let out = "";
+        let i = 0;
+        while (i < css.length) {
+            const at = css.indexOf("@media", i);
+            if (at < 0) { out += css.slice(i); break; }
+            out += css.slice(i, at);
+            let depth = 0;
+            let j = css.indexOf("{", at);
+            if (j < 0) break;
+            for (; j < css.length; j++) {
+                if (css[j] === "{") depth++;
+                else if (css[j] === "}" && --depth === 0) { j++; break; }
+            }
+            i = j;
+        }
+        return out;
+    };
+
+    // Une largeur imposée au-delà de la plus petite fenêtre courante fait
+    // déborder la page. Les caps (`max-width`) sont sans danger, les planchers
+    // (`width`, `min-width`) non.
+    const NARROWEST = 320;
+    const offenders = [];
+    for (const [name, css] of sheets) {
+        const base = withoutMedia(css);
+        for (const m of base.matchAll(/(^|[;{\s])(min-width|width)\s*:\s*(\d+)px/g)) {
+            if (Number(m[3]) > NARROWEST) offenders.push(`${name}.css ${m[2]}: ${m[3]}px`);
+        }
+    }
+    ok(`aucune largeur imposée au-delà de ${NARROWEST}px hors media query`,
+       offenders.length === 0, offenders.join(" | "));
+
+    // Les quatre feuilles qui portent de la mise en page doivent avoir un
+    // traitement des écrans étroits.
+    for (const [name, css] of sheets.filter(([n]) => n !== "tokens")) {
+        ok(`${name}.css prévoit les écrans étroits`,
+           /@media\s*\(max-width:\s*\d+px\)/.test(css));
+    }
+
+    const base = sheets.find(([n]) => n === "base")[1];
+    const narrow = /@media\s*\(max-width:\s*560px\)\s*\{([\s\S]*)\n\}/.exec(base)?.[1] ?? "";
+    ok("la barre haute est allégée : sous-titre et badge de version retirés",
+       /\.brand small\s*\{\s*display:\s*none/.test(narrow) &&
+       /#version-badge\s*\{\s*display:\s*none/.test(narrow), narrow.replace(/\s+/g, " ").slice(0, 120));
+    ok("la marque ne passe jamais à la ligne dans une barre de 48 px",
+       /\.brand\s*\{[^}]*white-space:\s*nowrap/.test(base));
+
+    // Un message long ne doit pas dépasser de l'écran.
+    ok("les messages sont bridés à la largeur de la fenêtre",
+       /#toasts\s*\{[^}]*max-width:\s*calc\(100vw/.test(base));
+
+    const matrixCss = sheets.find(([n]) => n === "matrix")[1];
+    ok("un menu déroulant ne peut pas être plus large que la fenêtre",
+       /\.dropdown-panel\s*\{[^}]*max-width:\s*calc\(100vw/.test(matrixCss));
+
+    // La légende repliable suppose que le markup porte bien la classe.
+    ok("les états non chiffrables de la légende sont marqués pour être repliés",
+       window.document.querySelectorAll("#matrix-legend .legend-item.aside").length === 2,
+       String(window.document.querySelectorAll("#matrix-legend .legend-item.aside").length));
+
+    // La page elle-même ne défile jamais latéralement : chaque vue gère son
+    // propre débordement.
+    ok("le corps de page ne défile pas", /body\s*\{[^}]*overflow:\s*hidden/.test(base));
+    ok("la matrice défile dans son enveloppe, pas dans la page",
+       /#matrix-wrapper\s*\{[^}]*overflow:\s*auto/.test(matrixCss));
+    const quizCss = sheets.find(([n]) => n === "quiz")[1];
+    ok("le questionnaire défile verticalement", /#view-quiz\s*\{[^}]*overflow-y:\s*auto/.test(quizCss));
+    ok("l'accueil défile verticalement", /id="view-home" class="view scrollable"/.test(html));
+}
 
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);
 process.exit(failures ? 1 : 0);

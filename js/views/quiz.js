@@ -10,7 +10,8 @@
    ========================================================================= */
 
 import { esc, $, toast } from "../ui.js";
-import { CATALOG, LEVEL_LABELS, getQuestionnaire } from "../catalog.js";
+import { QUESTIONNAIRES, LEVEL_LABELS, getQuestionnaire } from "../catalog.js";
+import { resolvedEntries, sharedText, sharedWith } from "../shared-questions.js";
 import { mitigationLevel } from "../scoring.js";
 import { setAnswer, progress, questionnaireState, nextTarget, reviewTarget, acquiredMitigations } from "../layer.js";
 
@@ -25,13 +26,13 @@ export function resetQuiz() {
 }
 
 export function renderQuiz(app, { mitigation } = {}) {
-    if (!CATALOG.size) {
+    if (!QUESTIONNAIRES.size) {
         $("#view-quiz").innerHTML = `<div class="quiz-inner"><p class="matrix-empty">
             Aucun questionnaire n'est encore intégré.</p></div>`;
         return;
     }
 
-    if (mitigation && CATALOG.has(mitigation)) {
+    if (mitigation && QUESTIONNAIRES.has(mitigation)) {
         // Arrivée depuis « Modifier ma réponse » : on ouvre la mitigation visée
         // au début de son questionnaire.
         goTo(mitigation, 0);
@@ -103,7 +104,7 @@ function paintNothingToReview(app) {
 function paint(app) {
     const { layer } = app;
     const questionnaire = getQuestionnaire(cursor.mitigation);
-    const entries = layer.answers[cursor.mitigation] || {};
+    const entries = resolvedEntries(layer, cursor.mitigation);
     const level = mitigationLevel(questionnaire, entries, layer.scoring, layer);
 
     if (cursor.showResult) { paintResult(app, questionnaire, level ?? 0); return; }
@@ -142,7 +143,8 @@ function paint(app) {
                     Niveau visé : <b>${question.level} — ${esc(LEVEL_LABELS[question.level])}</b>
                     ${question.docRequired ? ' · <span class="doc-flag">preuve documentaire attendue</span>' : ""}
                 </div>
-                <p class="quiz-question">${esc(question.text)}</p>
+                <p class="quiz-question">${esc(sharedText(questionnaire.id, question.num) ?? question.text)}</p>
+                ${sharedNotice(questionnaire.id, question.num)}
 
                 <div class="quiz-answers">
                     <button class="quiz-answer yes ${answered === "Oui" ? "selected" : ""}" data-answer="Oui">Oui</button>
@@ -183,6 +185,17 @@ function paint(app) {
     $("#q-matrix").onclick = () => app.show("matrix");
 }
 
+/** Signale qu'une question est commune à d'autres mitigations. */
+function sharedNotice(mitigationId, num) {
+    const others = sharedWith(mitigationId, num);
+    if (!others.length) return "";
+
+    return `<p class="quiz-shared">
+        <span class="quiz-shared-icon" aria-hidden="true">⇄</span>
+        Même question que ${others.map(id => `<b>${esc(id)}</b>`).join(" et ")}
+    </p>`;
+}
+
 /**
  * Signale qu'une note dépend aussi d'une question posée dans une autre
  * mitigation, et où en est cette réponse.
@@ -191,7 +204,7 @@ function contributionNotice(layer, questionnaire) {
     if (!questionnaire.contributions?.length) return "";
 
     const parts = questionnaire.contributions.map(({ from, question, weight }) => {
-        const value = layer.answers?.[from]?.[question]?.value;
+        const value = resolvedEntries(layer, from)[question]?.value;
         const effect = value === "Oui" ? `+${weight}`
             : value === "Non" ? `−${weight}`
                 : value ? "sans effet" : "pas encore répondue";
@@ -222,11 +235,19 @@ function answer(app, value) {
     const questionnaire = getQuestionnaire(cursor.mitigation);
     const question = questionnaire.questions[cursor.index];
 
+    const wasAnswered = resolvedEntries(app.layer, cursor.mitigation)[question.num]?.value ?? null;
     const dropped = setAnswer(app.layer, cursor.mitigation, question.num, {
         value,
         tool: $("#q-tool")?.value.trim() ?? "",
     });
     app.onLayerChange();
+
+    // Modifier une réponse commune se répercute ailleurs : on le dit, sinon la
+    // note d'une autre mitigation bougerait sans explication.
+    const others = sharedWith(cursor.mitigation, question.num);
+    if (others.length && wasAnswered && wasAnswered !== value) {
+        toast(`Réponse commune modifiée : ${others.join(", ")} ${others.length > 1 ? "sont" : "est"} aussi concernée${others.length > 1 ? "s" : ""}.`);
+    }
 
     // Un « Non » clôt la mitigation : c'est la règle du parcours progressif.
     if (value === "Non") {
@@ -250,10 +271,47 @@ function advance(app) {
 
 /* ------------------------------------------------------------------ résultat */
 
+/**
+ * Actions de fin de mitigation.
+ *
+ * Sur un parcours de 43 mitigations, l'action dominante est d'enchaîner : elle
+ * est seule à être mise en avant, et annonce ce qui vient pour que le répondant
+ * sache où il va. Revoir ses réponses et aller à la matrice restent des
+ * échappatoires, discrètes. Quand il n'y a plus rien à enchaîner, c'est la
+ * matrice qui devient l'action principale.
+ */
+function resultActions(app, global, target) {
+    const secondary = `<button class="btn btn-ghost btn-sm" id="r-review">Revoir mes réponses</button>`;
+
+    if (!target) {
+        return `<div class="result-actions">
+            <div class="result-secondary">${secondary}</div>
+            <button class="btn btn-primary btn-lg" id="r-matrix">
+                <span class="rn-label">Voir la matrice</span>
+                <span class="rn-target">Tout est traité</span>
+            </button>
+        </div>`;
+    }
+
+    const next = getQuestionnaire(target.mitigation);
+    const label = global.complete ? "Point de blocage suivant" : "Mitigation suivante";
+
+    return `<div class="result-actions">
+        <div class="result-secondary">
+            ${secondary}
+            <button class="btn btn-ghost btn-sm" id="r-matrix">Voir la matrice</button>
+        </div>
+        <button class="btn btn-primary btn-lg" id="r-next">
+            <span class="rn-label">${label} →</span>
+            <span class="rn-target">${esc(target.mitigation)} · ${esc(next.name)}</span>
+        </button>
+    </div>`;
+}
+
 function paintResult(app, questionnaire, level) {
     const rounded = Math.round(level);
     const global = progress(app.layer);
-    const entries = app.layer.answers[questionnaire.id] || {};
+    const entries = resolvedEntries(app.layer, questionnaire.id);
     const state = questionnaireState(questionnaire, entries);
     // En première passe, la prochaine mitigation à traiter. Une fois tout
     // traité, le prochain point de blocage à relire, en repartant après
@@ -296,13 +354,7 @@ function paintResult(app, questionnaire, level) {
                             `<li><span class="t-q">Q${t.num}</span> ${esc(t.tool)}</li>`).join("")}</ul>
                     </div>` : ""}
 
-                <div class="result-actions">
-                    <button class="btn" id="r-review">Revoir cette mitigation</button>
-                    ${target ? `<button class="btn" id="r-next">
-                        ${progress(app.layer).complete ? "Point de blocage suivant" : "Mitigation suivante"}
-                    </button>` : ""}
-                    <button class="btn btn-primary" id="r-matrix">Voir la matrice</button>
-                </div>
+                ${resultActions(app, global, target)}
             </div>
         </div>`;
 

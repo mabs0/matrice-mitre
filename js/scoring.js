@@ -14,6 +14,8 @@
    figé dans le code.
    ========================================================================= */
 
+import { resolvedEntries } from "./shared-questions.js";
+
 export const SCORING_MODES = {
     "last-yes": {
         label: "Niveau du dernier « Oui »",
@@ -56,7 +58,7 @@ export function mitigationLevel(questionnaire, answers = {}, mode = "last-yes", 
 function ownLevel(questionnaire, answers = {}, mode = "last-yes") {
     if (!questionnaire) return null;
 
-    const rows = questionnaire.questions.map(q => ({ q, value: answers[q.num]?.value ?? null }));
+    const rows = reachable(questionnaire.questions.map(q => ({ q, value: answers[q.num]?.value ?? null })));
     if (!rows.some(r => r.value)) return null;          // questionnaire non commencé
 
     const yes = rows.filter(r => r.value === "Oui");
@@ -90,6 +92,20 @@ function ownLevel(questionnaire, answers = {}, mode = "last-yes") {
     return clamp(yes[yes.length - 1].q.level);
 }
 
+/**
+ * Ne garde que les questions que le parcours atteint réellement.
+ *
+ * Le questionnaire est progressif : un « Non » le clôt, et ce qui suit n'aurait
+ * jamais été posé. La note s'arrête donc là, sans considérer ce qui pourrait
+ * subsister au-delà — typiquement la réponse à une question commune, conservée
+ * parce qu'une autre mitigation en a besoin. Une mitigation est notée sur son
+ * propre parcours, pas sur le contenu du stockage.
+ */
+function reachable(rows) {
+    const stop = rows.findIndex(r => r.value === "Non");
+    return stop < 0 ? rows : rows.slice(0, stop + 1);
+}
+
 const clamp = n => Math.max(0, Math.min(4, n));
 
 /**
@@ -111,7 +127,8 @@ function contributionOf(questionnaire, layer) {
 
     let delta = 0;
     for (const { from, question, weight } of questionnaire.contributions) {
-        const value = layer.answers?.[from]?.[question]?.value;
+        // Résolu, au cas où la question source serait elle-même commune.
+        const value = resolvedEntries(layer, from)[question]?.value;
         if (value === "Oui") delta += weight;
         else if (value === "Non") delta -= weight;
     }
@@ -168,14 +185,20 @@ function aggregate(values, mode = "average") {
     return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-/** Niveau de chaque mitigation dont le questionnaire a été entamé. */
+/**
+ * Niveau de chaque mitigation dont le questionnaire a été entamé.
+ *
+ * On parcourt le catalogue et non les réponses enregistrées : une mitigation
+ * peut n'avoir aucune réponse en propre et être tout de même notée, si sa
+ * première question est commune et portée par une autre.
+ */
 export function mitigationLevels(layer) {
     const out = new Map();
-    for (const [id, entry] of Object.entries(layer.answers || {})) {
-        const questionnaire = layer.catalog?.get(id);
+    for (const id of layer.catalog?.keys() ?? []) {
+        const questionnaire = layer.catalog.get(id);
         // Le layer est passé pour que les contributions d'autres mitigations
         // puissent être lues.
-        const level = mitigationLevel(questionnaire, entry, layer.scoring, layer);
+        const level = mitigationLevel(questionnaire, resolvedEntries(layer, id), layer.scoring, layer);
         if (level !== null) out.set(id, level);
     }
     return out;
