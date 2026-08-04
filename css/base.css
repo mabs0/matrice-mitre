@@ -332,13 +332,13 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
 
    Un seul point de rupture pour la coquille. La barre haute est le point
    sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. On y
-   retire le sous-titre de la marque et le badge de version — la version est de
-   toute façon rappelée sur l'accueil — pour laisser la place à l'onglet du
-   layer et à la bascule de thème. */
+   retire le sous-titre de la marque, et le badge de version se réduit à son
+   numéro — il n'apparaît que sur l'accueil, où il ne dispute la place à
+   personne, mais la place est comptée. */
 @media (max-width: 560px) {
     #topbar { gap: 9px; padding: 0 10px; }
     .brand small { display: none; }
-    #version-badge { display: none; }
+    .version-badge .vb-long { display: none; }
     .layer-tab { max-width: none; }
 
     .modal { padding: 3vh 10px; }

@@ -12,6 +12,81 @@
     <link rel="stylesheet" href="css/matrix.css">
     <link rel="stylesheet" href="css/quiz.css">
 
+    <script>
+    /*
+        Apparie feuilles de style et modules au document qui les demande.
+
+        GitHub Pages sert les fichiers avec une durée de vie courte mais non
+        nulle. Un navigateur peut donc très bien avoir le HTML et les scripts
+        d'une publication, et le CSS de la précédente : les sélecteurs récents
+        n'existent pas, des blocs entiers se retrouvent sans mise en forme, et
+        rien ne le signale — aucune erreur, aucune trace en console. C'est
+        arrivé, l'accueil s'affichait en pièces détachées sur mobile.
+
+        Le jeton est la date de dernière modification du document lui-même. Elle
+        change à chaque publication, et c'est celle de la copie effectivement
+        servie : quand le HTML vient du cache, le CSS d'époque est redemandé
+        avec lui, et les deux restent cohérents. Entre deux publications le
+        jeton ne bouge pas, donc le cache continue de faire son travail.
+
+        Mesuré sur GitHub Pages : tous les fichiers d'une publication portent la
+        même date — celle du déploiement, pas celle du commit du fichier. Le
+        jeton bouge donc même quand seul le CSS a changé.
+
+        À défaut d'en-tête `Last-Modified`, `document.lastModified` vaut l'heure
+        courante : on retombe alors sur un rechargement à chaque visite, ce qui
+        est le comportement sûr.
+
+        Le graphe de modules est versionné par une carte d'imports, et non en
+        collant un jeton sur `main.js` : les spécificateurs relatifs de ses
+        imports ne l'héritent pas, on rechargerait le point d'entrée en laissant
+        ses dépendances en cache. C'est-à-dire le défaut d'origine à l'envers —
+        et il a été observé : du CSS neuf sur un markup ancien. Une carte
+        d'imports agit sur tout le graphe d'un coup ; la liste ci-dessous est
+        tenue à jour par une assertion du banc, qui la compare au contenu de
+        `js/`.
+    */
+    (function () {
+        // En file:// rien ne se chargera de toute façon : on laisse le
+        // diagnostic ci-dessous s'expliquer sur une page correctement mise en forme.
+        if (location.protocol === "file:") return;
+
+        var stamp = document.lastModified.replace(/\D/g, "");
+
+        var links = document.querySelectorAll('link[rel="stylesheet"]');
+        for (var i = 0; i < links.length; i++) {
+            links[i].href = links[i].getAttribute("href").split("?")[0] + "?v=" + stamp;
+        }
+
+        var modules = [
+            "attack", "catalog", "io", "layer", "main", "scoring",
+            "shared-questions", "theme", "ui",
+            "views/home", "views/home-visuals", "views/matrix", "views/quiz",
+        ];
+        // Clés et valeurs en URL absolues. Une valeur relative doit commencer
+        // par « ./ » pour qu'une carte d'imports l'accepte ; sans cela elle est
+        // normalisée à null et le module se retrouve bloqué, pas seulement
+        // non versionné.
+        var imports = {};
+        for (var j = 0; j < modules.length; j++) {
+            var url = new URL("js/" + modules[j] + ".js", document.baseURI).href;
+            imports[url] = url + "?v=" + stamp;
+        }
+        var map = document.createElement("script");
+        map.type = "importmap";
+        map.textContent = JSON.stringify({ imports: imports });
+        document.head.appendChild(map);
+
+        // La carte ne s'applique pas au `src` du script racine : lui porte son
+        // jeton directement. Un module est différé par nature, le placer ici
+        // équivaut à le placer en fin de corps.
+        var entry = document.createElement("script");
+        entry.type = "module";
+        entry.src = "js/main.js?v=" + stamp;
+        document.head.appendChild(entry);
+    })();
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -136,6 +211,10 @@
     <div class="modal" id="modal"><div class="modal-panel" id="modal-panel"></div></div>
     <div id="toasts"></div>
 
-    <script type="module" src="js/main.js"></script>
+    <!--
+        Le module d'entrée est injecté par le script de l'en-tête, avec le jeton
+        de publication. Il n'y a pas de balise ici : deux points d'entrée
+        chargeraient l'application deux fois.
+    -->
 </body>
 </html>

@@ -3,7 +3,7 @@
    questionnaire alimente la matrice et que l'export/import fait un aller-retour. */
 
 import { JSDOM } from "jsdom";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import * as XLSXmod from "xlsx";
 import CryptoJSmod from "crypto-js";
 
@@ -1045,6 +1045,7 @@ window.document.getElementById("brand").click();
     const home = window.document.getElementById("view-home");
     // Les mêmes données normalisées que celles servies à l'application.
     const data = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
 
     // La toile : un rayon par mitigation, quatre polygones de repère.
     ok("un rayon par mitigation évaluable",
@@ -1090,6 +1091,41 @@ window.document.getElementById("brand").click();
     ok("la rosace est légendée comme un exemple",
        /Exemple/.test(home.querySelector(".rosace-figure figcaption")?.textContent ?? ""));
 
+    /* --- les axes sont nommés --- */
+
+    // Sans libellé, la rosace ne se lit qu'au survol : un geste qui n'existe pas
+    // au doigt, donc pas de lecture du tout sur un téléphone.
+    const axes = home.querySelectorAll(".ros-axis");
+    ok("chaque rayon porte le nom de sa mitigation",
+       [...axes].map(a => a.textContent).join(",") === [...QST.keys()].join(","),
+       `${axes.length} libellés pour ${QST.size} rayons`);
+    ok("les libellés sont couchés dans l'axe de leur rayon",
+       [...axes].every(a => /^rotate\(-?[\d.]+ [\d.]+ [\d.]+\)$/.test(a.getAttribute("transform") ?? "")),
+       axes[0]?.getAttribute("transform"));
+    // Sur la moitié gauche, un libellé non retourné se lirait tête en bas.
+    const flipped = [...axes].filter(a => a.classList.contains("flip"));
+    ok("ceux de la moitié gauche sont retournés",
+       flipped.length > 0 && flipped.length < axes.length,
+       `${flipped.length} retournés sur ${axes.length}`);
+    ok("et ancrés par la fin, pour continuer de s'éloigner du centre",
+       /\.ros-axis\.flip\s*\{\s*text-anchor:\s*end/.test(homeCss));
+
+    // Un libellé qui sort du viewBox est rogné, ou mord sur le texte voisin.
+    // C'est ce que `rMax` doit laisser comme marge : on le vérifie plutôt que de
+    // le supposer, la largeur d'un « M1015 » n'étant pas négociable.
+    const box = home.querySelector(".rosace").getAttribute("viewBox").split(/\s+/).map(Number);
+    const centre = box[2] / 2;
+    const font = Number(/\.ros-axis\s*\{[^}]*font-size:\s*([\d.]+)px/.exec(homeCss)[1]);
+    const chars = Math.max(...[...QST.keys()].map(id => id.length));
+    const spill = [...axes].filter(a => {
+        const r = Math.hypot(Number(a.getAttribute("x")) - centre, Number(a.getAttribute("y")) - centre);
+        return r + chars * font * 0.66 > centre;   // 0,66 em par caractère, majuscule comprise
+    });
+    ok("les libellés tiennent dans le cadre de la rosace", spill.length === 0,
+       `${spill.length} débordent, marge disponible ${(centre - Math.hypot(
+           Number(axes[0].getAttribute("x")) - centre,
+           Number(axes[0].getAttribute("y")) - centre)).toFixed(1)}px`);
+
     // La matrice de fond reprend la vraie structure du référentiel : une colonne
     // par tactique, autant de cases que de techniques. C'est cette silhouette
     // qui la rend reconnaissable.
@@ -1128,20 +1164,29 @@ window.document.getElementById("brand").click();
     // apparaît. On vérifie la couverture sur toute la plage de l'animation, en
     // tenant compte de l'écrêtage par le viewport SVG — rien hors de celui-ci
     // n'est dessiné.
+    // La largeur garantie est annoncée par le markup : elle suit la fenêtre, avec
+    // un plancher qui laisse de la marge pour une rotation. Couvrir le 4 K en
+    // toutes circonstances coûtait une copie de plus à tout le monde.
+    const cover = Number(backdrop.dataset.couvre);
+    ok("la largeur couverte suit la fenêtre, avec de la marge",
+       cover >= window.innerWidth && cover >= 1440,
+       `${cover}px annoncés pour une fenêtre de ${window.innerWidth}px`);
+
     const svgWidth = Number(home.querySelector(".home-backdrop svg").getAttribute("width"));
     const holes = [];
     for (const band of home.querySelectorAll(".bd-band")) {
         const xs = [...band.querySelectorAll("use")].map(u => Number(u.getAttribute("x")));
         const left = Math.max(0, Math.min(...xs));
         const right = Math.min(svgWidth, Math.max(...xs) + trame);
-        for (const screen of [1280, 1920, 2560, 3840]) {
+        for (const screen of [320, 768, cover]) {
             // L'animation translate de −1 trame à 0.
             for (const t of [-trame, -trame / 2, -1, 0]) {
                 if (left + t > 0 || right + t < screen) holes.push(`${screen}px à t=${t}`);
             }
         }
     }
-    ok("aucun trou dans le défilement, jusqu'au 4K", holes.length === 0, holes.slice(0, 3).join(" | "));
+    ok("aucun trou dans le défilement, du téléphone à la largeur annoncée",
+       holes.length === 0, holes.slice(0, 3).join(" | "));
 
     ok("les bandes sont déphasées, pas décalées géométriquement",
        new Set([...home.querySelectorAll(".bd-band")]
@@ -1149,7 +1194,6 @@ window.document.getElementById("brand").click();
        [...home.querySelectorAll(".bd-band")].every(b =>
            [...b.querySelectorAll("use")].every((u, i) => Number(u.getAttribute("x")) === i * trame)));
 
-    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
     ok("le CSS anime d'une variable, sans redire la géométrie",
        /translateX\(calc\(-1 \* var\(--trame\)\)\)/.test(homeCss) &&
        !/translateX\(-?\d+px\)/.test(homeCss));
@@ -1403,9 +1447,10 @@ console.log("\n[30] Tenue sur écran étroit");
 
     const base = sheets.find(([n]) => n === "base")[1];
     const narrow = /@media\s*\(max-width:\s*560px\)\s*\{([\s\S]*)\n\}/.exec(base)?.[1] ?? "";
-    ok("la barre haute est allégée : sous-titre et badge de version retirés",
+    ok("la barre haute est allégée : sous-titre retiré, version réduite à son numéro",
        /\.brand small\s*\{\s*display:\s*none/.test(narrow) &&
-       /#version-badge\s*\{\s*display:\s*none/.test(narrow), narrow.replace(/\s+/g, " ").slice(0, 120));
+       /\.version-badge \.vb-long\s*\{\s*display:\s*none/.test(narrow),
+       narrow.replace(/\s+/g, " ").slice(0, 120));
     ok("la marque ne passe jamais à la ligne dans une barre de 48 px",
        /\.brand\s*\{[^}]*white-space:\s*nowrap/.test(base));
 
@@ -1430,6 +1475,101 @@ console.log("\n[30] Tenue sur écran étroit");
     const quizCss = sheets.find(([n]) => n === "quiz")[1];
     ok("le questionnaire défile verticalement", /#view-quiz\s*\{[^}]*overflow-y:\s*auto/.test(quizCss));
     ok("l'accueil défile verticalement", /id="view-home" class="view scrollable"/.test(html));
+
+    /* --- ce qu'on ne montre pas, ou autrement, sur un petit écran --- */
+
+    const homeCss = sheets.find(([n]) => n === "home")[1];
+    // Le fond doit rester visible sur un téléphone : c'est là qu'il donne le plus
+    // à voir de ce que fait l'outil. Il n'est ni masqué, ni affaibli — seule
+    // l'échancrure du masque se resserre sur le bloc de texte.
+    ok("le fond qui défile reste affiché sur un téléphone",
+       !/\.home-backdrop\s*\{\s*display:\s*none/.test(homeCss));
+    // L'intensité reste réglable d'un seul endroit : la variable, portée par le
+    // conteneur. Un `opacity` posé ailleurs rendrait le réglage introuvable.
+    const fonds = [...homeCss.matchAll(/([.#\w-]+)\s*\{[^}]*?--fond:\s*([\d.]+)/g)]
+        .map(m => `${m[1]}=${m[2]}`);
+    ok("l'intensité se règle depuis .home-backdrop et nulle part ailleurs",
+       fonds.length > 0 && fonds.every(f => f.startsWith(".home-backdrop")),
+       fonds.join(" "));
+    ok("son masque se resserre quand le contenu prend toute la largeur",
+       /@media\s*\(max-width:\s*700px\)\s*\{[^}]*\.home-backdrop\s*\{[^}]*mask-image/.test(homeCss));
+    // Trois chiffres sur deux colonnes : `auto-fit` replie une colonne vide, pas
+    // un trou en fin de ligne.
+    ok("les chiffres ne laissent pas de case vide sur deux colonnes",
+       /\.home-stats \.stat:last-child:nth-child\(odd\)\s*\{\s*grid-column:\s*1 \/ -1/.test(homeCss));
+    ok("empilées, les trois étapes mettent leur numéro en regard du titre",
+       /\.step-num\s*\{\s*grid-row:\s*span 2/.test(homeCss));
+
+    // Le badge de version ne vit que sur l'accueil : ailleurs il n'apprend rien
+    // et dispute la barre haute à l'onglet du layer, qui porte l'avancement.
+    const versionBadge = window.document.getElementById("version-badge");
+    window.document.getElementById("brand").click();
+    ok("le badge de version s'affiche sur l'accueil",
+       !versionBadge.classList.contains("hidden"));
+    window.document.getElementById("home-explore").click();
+    ok("il disparaît dès qu'on quitte l'accueil",
+       versionBadge.classList.contains("hidden"));
+}
+
+/* --------------------------------------------- cohérence entre HTML et CSS */
+
+console.log("\n[31] Le CSS servi est apparié au document qui le demande");
+{
+    // Le défaut observé : GitHub Pages sert le HTML et les scripts d'une
+    // publication et le CSS de la précédente. Aucune erreur ne le signale, et la
+    // page s'affiche en pièces détachées — sélecteurs récents absents, blocs
+    // sans mise en forme. C'est ainsi que l'accueil est arrivé « en bordel » sur
+    // mobile alors qu'il était correct dans le dépôt.
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    const stamper = /<script>([\s\S]*?document\.lastModified[\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    ok("les feuilles de style portent un jeton de publication", !!stamper);
+    ok("le jeton vient de la date du document, pas d'un numéro à maintenir",
+       /document\.lastModified/.test(stamper) && !/\bDate\.now\(\)/.test(stamper));
+    ok("il s'applique à toutes les feuilles",
+       /querySelectorAll\('link\[rel="stylesheet"\]'\)/.test(stamper));
+    // Sans cela, deux jetons s'empileraient à chaque passage.
+    ok("un jeton déjà présent est remplacé, pas accumulé",
+       /split\("\?"\)\[0\]/.test(stamper));
+
+    // Le jeton est posé avant le corps de page : après le premier rendu, le
+    // navigateur a déjà peint avec la feuille périmée.
+    ok("il est posé dans l'en-tête, avant tout affichage",
+       html.indexOf("document.lastModified") < html.indexOf("<body"));
+
+    /* --- le graphe de modules, versionné d'un seul tenant --- */
+
+    // Coller le jeton sur `main.js` seul rechargerait le point d'entrée en
+    // laissant ses imports en cache : le défaut d'origine à l'envers. Une carte
+    // d'imports agit sur tout le graphe.
+    ok("le graphe de modules passe par une carte d'imports",
+       /type = "importmap"/.test(stamper) && /new URL\([^)]*document\.baseURI\)\.href/.test(stamper));
+    // Le piège, mesuré dans le navigateur : une valeur de carte qui ne commence
+    // ni par un protocole ni par « ./ » est normalisée à null, et le module
+    // n'est pas seulement laissé sans jeton — il devient introuvable.
+    ok("clés et valeurs de la carte sont des URL absolues",
+       /imports\[url\] = url \+ "\?v=" \+ stamp/.test(stamper));
+    ok("un seul point d'entrée, injecté avec son jeton",
+       /entry\.src = "js\/main\.js\?v=" \+ stamp/.test(stamper) &&
+       !/<script type="module"/.test(html));
+
+    // La liste des modules est écrite à la main : si un module s'ajoute sans y
+    // figurer, il n'est plus versionné et le mélange redevient possible. C'est
+    // cette assertion qui tient la discipline, pas la mémoire de qui code.
+    const listed = [...(/var modules = \[([\s\S]*?)\];/.exec(stamper)?.[1] ?? "")
+        .matchAll(/"([^"]+)"/g)].map(m => `${m[1]}.js`).sort();
+    const onDisk = ["", "views/"].flatMap(dir =>
+        readdirSync(`${ROOT}/js/${dir}`, { withFileTypes: true })
+            .filter(e => e.isFile() && e.name.endsWith(".js"))
+            .map(e => `${dir}${e.name}`)).sort();
+    ok("la carte couvre exactement les modules du dossier js/",
+       listed.join(",") === onDisk.join(","),
+       `manquants : ${onDisk.filter(m => !listed.includes(m)).join(", ") || "aucun"} · ` +
+       `en trop : ${listed.filter(m => !onDisk.includes(m)).join(", ") || "aucun"}`);
+
+    // En file:// les modules ne chargent pas : le diagnostic doit pouvoir
+    // s'expliquer sur une page encore mise en forme.
+    ok("rien n'est réécrit en file://, pour garder le message de démarrage lisible",
+       /if \(location\.protocol === "file:"\) return;/.test(stamper));
 }
 
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);

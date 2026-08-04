@@ -35,6 +35,11 @@ const app = {
             $(`#view-${view}`).classList.toggle("hidden", view !== name);
         }
 
+        // Le badge de version n'appartient qu'à l'accueil. Ailleurs il n'apporte
+        // rien et dispute la barre haute à l'onglet du layer, qui porte, lui,
+        // l'avancement — l'information qu'on regarde vraiment.
+        $("#version-badge")?.classList.toggle("hidden", name !== "home" || !this.data);
+
         if (name === "home") renderHome(this);
         if (name === "matrix") renderMatrix(this);
         if (name === "quiz") renderQuiz(this, options);
@@ -155,11 +160,15 @@ async function boot() {
 
     const versionText = $("#version-text");
     const versionBadge = $("#version-badge");
-    if (versionText) versionText.innerHTML = `ATT&amp;CK Enterprise <b>v${esc(app.data.version)}</b>`;
+    // Sur un écran étroit, seul le numéro reste : « ATT&CK Enterprise » ne
+    // porte rien de plus que le contexte, qui est déjà connu.
+    if (versionText) {
+        versionText.innerHTML =
+            `<span class="vb-long">ATT&amp;CK Enterprise </span><b>v${esc(app.data.version)}</b>`;
+    }
     if (versionBadge) {
         versionBadge.title =
             `Publiée le ${new Date(app.data.modified).toLocaleDateString("fr-FR")} · relue à chaque chargement`;
-        versionBadge.classList.remove("hidden");
     }
 
     // Prévient une fermeture accidentelle : rien n'est stocké côté navigateur.

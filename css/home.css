@@ -71,7 +71,7 @@
 
 .home-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 330px;
     gap: 44px;
     align-items: center;
     margin-bottom: 44px;
@@ -135,6 +135,20 @@
     font-variant-numeric: tabular-nums;
     dominant-baseline: middle;
 }
+
+/* Nom de la mitigation en bout de rayon. Petit par nécessité — 43 libellés
+   autour de 320 px — mais c'est la seule lecture possible au doigt : il n'y a
+   pas de survol sur un téléphone. La rotation est portée par le markup, elle
+   dépend de l'angle du rayon. */
+.ros-axis {
+    fill: var(--text-mute);
+    font-family: var(--font);
+    font-size: 6.6px;
+    font-variant-numeric: tabular-nums;
+    text-anchor: start;
+    dominant-baseline: middle;
+}
+.ros-axis.flip { text-anchor: end; }
 
 /* Le tracé se dessine d'un trait : le contour est un tiret qui se déroule, et
    le remplissage arrive ensuite. */
@@ -207,17 +221,33 @@
 @media (max-width: 860px) {
     .home-hero { grid-template-columns: 1fr; gap: 32px; justify-items: center; text-align: center; }
     .home-lead { margin: 0 auto; }
-    .rosace-figure { width: min(268px, 100%); }
-    .home-backdrop { --fond: 0.11; }   /* moins de place, donc moins de fond */
+    /* La rosace ne rétrécit pas en dessous du seuil de lisibilité de ses
+       libellés : elle prend au contraire toute la largeur disponible. */
+    .rosace-figure { width: min(340px, 100%); }
+}
+
+/* Sur un écran étroit, le contenu occupe toute la largeur : le masque prévu pour
+   un titre en colonne de gauche recouvrait alors presque tout, et le fond
+   disparaissait. On resserre l'échancrure sur le seul bloc de texte du haut —
+   plus bas, les cartes sont opaques, elles se protègent d'elles-mêmes. */
+@media (max-width: 700px) {
+    .home-backdrop {
+        mask-image: radial-gradient(ellipse 92% 24% at 50% 15%,
+            transparent 0%, rgba(0, 0, 0, 0.3) 52%, #000 86%);
+        /* L'échancrure resserrée expose beaucoup plus de trame qu'en colonne :
+           à intensité égale la page devenait bariolée. */
+        --fond: 0.11;
+    }
 }
 
 @media (max-width: 560px) {
     .home-inner { padding: 32px 16px 44px; }
-    .rosace-figure { width: min(240px, 100%); }
-    /* Le fond s'efface encore : sur un petit écran le masque central ne suffit
-       plus à dégager le texte. */
-    .home-backdrop { --fond: 0.08; }
+    .rosace-figure { width: 100%; }
+    /* Une pilule qui passe à la ligne n'en est plus une : sur trois lignes, avec
+       le crénage des majuscules espacées, elle était illisible. On garde la
+       version, on lâche la mention de relecture — le tuto la portera. */
     .home-eyebrow { font-size: 0.63rem; padding: 4px 10px; }
+    .home-eyebrow .eb-long { display: none; }
     .step { padding: 14px 15px 15px; }
     .home-foot { margin-top: 26px; }
 }
@@ -283,6 +313,19 @@
 .stat .v { font-size: 1.3rem; font-weight: 650; letter-spacing: -0.02em; display: block; }
 .stat .k { font-size: 0.68rem; color: var(--text-mute); line-height: 1.35; display: block; margin-top: 3px; }
 
+/* Trois chiffres dans deux colonnes laissent une case vide en bas à droite :
+   `auto-fit` sait replier une colonne entière, pas boucher un trou de fin de
+   ligne. Le dernier prend donc la largeur restante. Le sélecteur ne s'applique
+   que si le compte est impair, pour rester juste si un quatrième chiffre
+   revient. */
+@media (max-width: 560px) {
+    .home-stats { grid-template-columns: repeat(2, 1fr); }
+    .home-stats .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    /* La case pleine largeur garderait son texte collé à gauche, seule sur sa
+       ligne : on centre les trois pour que la grille se tienne. */
+    .stat { text-align: center; }
+}
+
 /* ------------------------------------------- questionnaire, matrice, export
 
    Les trois temps du parcours, dans l'ordre. Une flèche entre les cases dit le
@@ -336,6 +379,12 @@
 @media (max-width: 700px) {
     .home-steps { grid-template-columns: 1fr; }
     .step + .step::before { content: none; }
+
+    /* Empilées, les trois cases feraient défiler pour rien si le numéro gardait
+       sa ligne : il passe à gauche du titre, le texte se cale dessous. */
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+    .step-num { grid-row: span 2; align-self: start; margin-bottom: 0; }
+    .step h3 { margin: 0; }
 }
 
 .home-secondary { text-align: center; margin-top: 26px; }

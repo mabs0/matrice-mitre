@@ -27,7 +27,7 @@ export function renderHome(app) {
             <div class="home-hero">
                 <div class="hero-text">
                     <span class="home-eyebrow">
-                        MITRE ATT&amp;CK Enterprise <b>v${esc(data.version)}</b> · relu à chaque chargement
+                        MITRE ATT&amp;CK Enterprise <b>v${esc(data.version)}</b><span class="eb-long"> · relu à chaque chargement</span>
                     </span>
                     <h1>Évaluez la <em>maturité cyber</em> de votre organisation<br>sur la matrice MITRE ATT&amp;CK</h1>
                     <p class="home-lead">

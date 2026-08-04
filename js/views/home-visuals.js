@@ -25,7 +25,10 @@ const DEMO_LEVELS = [
 
 /* --------------------------------------------------------------- la rosace */
 
-const ROSACE = { size: 320, r0: 34, rMax: 146 };
+/* `rMax` laisse la place aux libellés d'axe : le rayon utile s'arrête à 129 et
+   les noms de mitigation occupent la couronne restante, sans sortir du viewBox —
+   une assertion du banc mesure cette marge plutôt que de la supposer. */
+const ROSACE = { size: 320, r0: 34, rMax: 129 };
 
 const polar = (cx, cy, r, deg) => {
     const rad = (deg * Math.PI) / 180;
@@ -36,9 +39,9 @@ const polar = (cx, cy, r, deg) => {
  * Rosace de maturité, en toile d'araignée : un rayon par mitigation, un sommet
  * par niveau atteint, et le polygone qui les relie.
  *
- * Les axes ne sont pas étiquetés — à 43 rayons les libellés se chevaucheraient.
  * C'est la forme d'ensemble qui parle : là où le polygone se creuse, la maturité
- * manque. Le détail se lit au survol de chaque sommet.
+ * manque. Chaque rayon est nommé en bout pour qu'on sache *laquelle* se creuse
+ * sans avoir à survoler — un geste qui n'existe pas au doigt.
  */
 export function rosace() {
     const { size, r0, rMax } = ROSACE;
@@ -65,6 +68,25 @@ export function rosace() {
 
     const ticks = [1, 2, 3, 4].map(level =>
         `<text class="ros-tick" x="${c + 4}" y="${(c - radiusOf(level)).toFixed(1)}">${level}</text>`).join("");
+
+    // Le nom de la mitigation au bout de son rayon.
+    //
+    // Chaque libellé est couché dans l'axe de son rayon : c'est ce qui permet
+    // d'en poser 43 sans chevauchement. À 136 px du centre, deux rayons voisins
+    // sont écartés d'une vingtaine de pixels, quand un libellé couché n'occupe
+    // que la hauteur de sa police — posé à l'horizontale, il en faudrait cinq
+    // fois plus. Sur la moitié gauche le texte serait tête en bas : on le
+    // retourne et on l'ancre par la fin, pour qu'il continue de s'éloigner du
+    // centre.
+    const axes = ids.map((id, i) => {
+        const angle = angleOf(i);
+        const [x, y] = polar(c, c, rMax + 4, angle);
+        const turned = ((angle % 360) + 360) % 360;
+        const flip = turned > 90 && turned < 270;
+        const rot = (flip ? angle + 180 : angle).toFixed(1);
+        return `<text class="ros-axis${flip ? " flip" : ""}" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+                      transform="rotate(${rot} ${x.toFixed(1)} ${y.toFixed(1)})">${esc(id)}</text>`;
+    }).join("");
 
     // Le tracé de la maturité.
     let sum = 0;
@@ -100,6 +122,7 @@ export function rosace() {
                 <g class="ros-web-group">${spokes}${webs}</g>
                 <polygon class="ros-shape" points="${shape}" style="--tour:${perimeter.toFixed(0)}"/>
                 <g class="ros-dots">${vertices}</g>
+                <g class="ros-axes">${axes}</g>
                 ${ticks}
                 <circle class="ros-hub" cx="${c}" cy="${c}" r="${r0 - 6}"/>
                 <text class="ros-value" x="${c}" y="${c - 1}">${average}</text>
@@ -120,10 +143,15 @@ const BACKDROP = {
     maxRows: 28,       // les tactiques les plus fournies sont écrêtées
     repeats: 2,        // blocs de matrice côte à côte dans une trame
     bands: 3,
-    /* Largeur d'écran à couvrir. Le nombre de copies s'en déduit, plutôt que
-       d'être fixé : la trame dépend du nombre de tactiques du référentiel, et une
-       valeur en dur redeviendrait fausse si celui-ci changeait. */
-    coverWidth: 4096,
+    /* Plancher de largeur à couvrir. La largeur réelle est celle de la fenêtre,
+       ce plancher lui laissant de la marge pour une rotation ou un
+       redimensionnement — le fond n'est pas recomposé à chaque resize. Le nombre
+       de copies s'en déduit plutôt que d'être fixé : la trame dépend du nombre de
+       tactiques du référentiel, et une valeur en dur redeviendrait fausse si
+       celui-ci changeait. Couvrir 4 K en toutes circonstances coûtait une copie
+       de plus à tout le monde, téléphones compris, pour trois bandes à composer
+       en continu. */
+    coverFloor: 1440,
 };
 
 /** Durées de défilement, une par bande. Décalées pour donner de la profondeur. */
@@ -202,7 +230,8 @@ export function matrixBackdrop(data) {
     // Le bord gauche reste ≤ 0, et le bord droit vaut au pire
     // (copies − 1) × trame : c'est cette valeur qui doit dépasser l'écran, d'où
     // le nombre de copies.
-    const copyCount = Math.max(2, Math.ceil(BACKDROP.coverWidth / width) + 1);
+    const cover = Math.max(BACKDROP.coverFloor, globalThis.innerWidth || 0);
+    const copyCount = Math.max(2, Math.ceil(cover / width) + 1);
     const totalWidth = copyCount * width;
     const strips = Array.from({ length: bands }, (_, b) => {
         const y = b * bandHeight;
@@ -224,7 +253,7 @@ export function matrixBackdrop(data) {
     // `--trame` est l'amplitude du défilement : le CSS anime de cette largeur
     // exactement, sans avoir à connaître la géométrie décrite ici.
     return `
-        <div class="home-backdrop" aria-hidden="true" style="--trame:${width}px">
+        <div class="home-backdrop" aria-hidden="true" data-couvre="${cover}" style="--trame:${width}px">
             <svg width="${totalWidth}" height="${bandHeight * bands}"
                  viewBox="0 0 ${totalWidth} ${bandHeight * bands}">
                 <defs><g id="bd-tiles">${parts.join("")}</g></defs>
