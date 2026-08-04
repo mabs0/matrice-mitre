@@ -27,14 +27,18 @@
     z-index: 0;
     overflow: hidden;
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
     pointer-events: none;
     opacity: var(--fond);
     mask-image: radial-gradient(ellipse 62% 54% at 46% 34%,
         transparent 0%, rgba(0, 0, 0, 0.28) 46%, #000 82%);
 }
-.home-backdrop svg { flex: none; }
+/* La trame n'est définie qu'ici, et n'est pas rendue : seules les bandes la
+   reprennent par référence. Surtout pas de `display: none` — voir le markup. */
+.bd-defs { position: absolute; width: 0; height: 0; }
+.bd-band > svg { display: block; }
 
 .bd-cell.lnone { fill: var(--border); opacity: 0.55; }
 .bd-cell.l0 { fill: var(--lvl0); }
@@ -58,7 +62,12 @@
    de départ, d'où la boucle sans couture. `--trame` est posée par le markup, la
    géométrie n'est pas redite ici. `--phase` est un délai négatif : il place
    chaque bande à un endroit différent du même cycle. */
+/* Une bande est un élément HTML et non un groupe SVG : WebKit — donc tout
+   navigateur sur iOS, Firefox compris — n'anime pas de façon fiable une
+   transformation CSS posée à l'intérieur d'un SVG. Le fond restait immobile sur
+   iPhone quand il défilait sur Chrome. */
 .bd-band {
+    flex: none;
     animation: bd-slide var(--dur, 110s) linear var(--phase, 0s) infinite;
     will-change: transform;
 }

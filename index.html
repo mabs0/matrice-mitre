@@ -58,6 +58,15 @@
             links[i].href = links[i].getAttribute("href").split("?")[0] + "?v=" + stamp;
         }
 
+        // Une carte d'imports demande Chrome 89, Safari 16.4, Firefox 108. Sur
+        // plus ancien, la carte serait ignorée et les modules resteraient
+        // introuvables : l'application ne démarrerait pas du tout. Mieux vaut
+        // alors charger sans jeton — c'est-à-dire risquer une version en cache
+        // plutôt qu'une page morte.
+        var carteSupportee = typeof HTMLScriptElement !== "undefined"
+            && typeof HTMLScriptElement.supports === "function"
+            && HTMLScriptElement.supports("importmap");
+
         var modules = [
             "attack", "catalog", "io", "layer", "main", "scoring",
             "shared-questions", "theme", "ui",
@@ -67,22 +76,27 @@
         // par « ./ » pour qu'une carte d'imports l'accepte ; sans cela elle est
         // normalisée à null et le module se retrouve bloqué, pas seulement
         // non versionné.
-        var imports = {};
-        for (var j = 0; j < modules.length; j++) {
-            var url = new URL("js/" + modules[j] + ".js", document.baseURI).href;
-            imports[url] = url + "?v=" + stamp;
+        if (carteSupportee) {
+            var imports = {};
+            for (var j = 0; j < modules.length; j++) {
+                var url = new URL("js/" + modules[j] + ".js", document.baseURI).href;
+                imports[url] = url + "?v=" + stamp;
+            }
+            var map = document.createElement("script");
+            map.type = "importmap";
+            map.textContent = JSON.stringify({ imports: imports });
+            document.head.appendChild(map);
         }
-        var map = document.createElement("script");
-        map.type = "importmap";
-        map.textContent = JSON.stringify({ imports: imports });
-        document.head.appendChild(map);
 
-        // La carte ne s'applique pas au `src` du script racine : lui porte son
-        // jeton directement. Un module est différé par nature, le placer ici
-        // équivaut à le placer en fin de corps.
+        // La carte ne s'applique pas au `src` du script racine. Il porte son
+        // jeton lui aussi — mais seulement si la carte a été posée : jetonner le
+        // seul point d'entrée rechargerait celui-ci en laissant ses imports en
+        // cache, soit précisément le mélange incohérent qu'on cherche à éviter.
+        // Un module est différé par nature, le placer ici équivaut à le placer
+        // en fin de corps.
         var entry = document.createElement("script");
         entry.type = "module";
-        entry.src = "js/main.js?v=" + stamp;
+        entry.src = carteSupportee ? "js/main.js?v=" + stamp : "js/main.js";
         document.head.appendChild(entry);
     })();
     </script>

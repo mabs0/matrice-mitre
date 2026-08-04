@@ -1148,6 +1148,16 @@ window.document.getElementById("brand").click();
        home.querySelectorAll("#bd-tiles").length === 1 &&
        home.querySelectorAll("defs #bd-tiles").length === 1);
     ok("elle est reprise par des <use>", home.querySelectorAll(".bd-band use").length >= 6);
+
+    // Le défilement porte sur un élément HTML. Une transformation CSS animée à
+    // l'intérieur d'un SVG n'est pas fiable dans WebKit — donc sur tout
+    // navigateur iOS, Firefox compris : le fond y restait immobile.
+    ok("les bandes sont des éléments HTML, pas des groupes SVG",
+       [...home.querySelectorAll(".bd-band")].every(b => b.tagName.toLowerCase() === "div"),
+       [...home.querySelectorAll(".bd-band")].map(b => b.tagName).join(","));
+    ok("la trame est définie hors des bandes, dans un SVG qui n'est pas masqué",
+       !!home.querySelector(".bd-defs defs #bd-tiles") &&
+       !/display:\s*none/.test(home.querySelector(".bd-defs").getAttribute("style") ?? ""));
     ok("les bandes défilent à des vitesses différentes",
        new Set([...home.querySelectorAll(".bd-band")]
            .map(b => b.style.getPropertyValue("--dur"))).size > 1);
@@ -1172,7 +1182,7 @@ window.document.getElementById("brand").click();
        cover >= window.innerWidth && cover >= 1440,
        `${cover}px annoncés pour une fenêtre de ${window.innerWidth}px`);
 
-    const svgWidth = Number(home.querySelector(".home-backdrop svg").getAttribute("width"));
+    const svgWidth = Number(home.querySelector(".bd-band > svg").getAttribute("width"));
     const holes = [];
     for (const band of home.querySelectorAll(".bd-band")) {
         const xs = [...band.querySelectorAll("use")].map(u => Number(u.getAttribute("x")));
@@ -1549,8 +1559,16 @@ console.log("\n[31] Le CSS servi est apparié au document qui le demande");
     ok("clés et valeurs de la carte sont des URL absolues",
        /imports\[url\] = url \+ "\?v=" \+ stamp/.test(stamper));
     ok("un seul point d'entrée, injecté avec son jeton",
-       /entry\.src = "js\/main\.js\?v=" \+ stamp/.test(stamper) &&
+       /entry\.src = carteSupportee \? "js\/main\.js\?v=" \+ stamp : "js\/main\.js"/.test(stamper) &&
        !/<script type="module"/.test(html));
+
+    // Sur un navigateur trop ancien pour les cartes d'imports, la carte serait
+    // ignorée et les modules deviendraient introuvables : page morte. On y
+    // charge sans jeton — risquer une version en cache plutôt que rien du tout.
+    // Et surtout pas le point d'entrée seul, qui rendrait le mélange certain.
+    ok("un navigateur sans carte d'imports charge quand même l'application",
+       /HTMLScriptElement\.supports\("importmap"\)/.test(stamper) &&
+       /if \(carteSupportee\) \{/.test(stamper));
 
     // La liste des modules est écrite à la main : si un module s'ajoute sans y
     // figurer, il n'est plus versionné et le mélange redevient possible. C'est

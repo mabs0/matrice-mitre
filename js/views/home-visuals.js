@@ -233,8 +233,14 @@ export function matrixBackdrop(data) {
     const cover = Math.max(BACKDROP.coverFloor, globalThis.innerWidth || 0);
     const copyCount = Math.max(2, Math.ceil(cover / width) + 1);
     const totalWidth = copyCount * width;
+
+    // Chaque bande est un élément **HTML**, pas un groupe SVG.
+    //
+    // Ce n'est pas un détail de forme : WebKit n'anime pas de façon fiable une
+    // transformation CSS posée sur un élément interne d'un SVG. Le fond restait
+    // parfaitement immobile sur iOS quand il défilait sur Chrome. Translater un
+    // `div` est en revanche le cas le mieux accéléré qui existe, partout.
     const strips = Array.from({ length: bands }, (_, b) => {
-        const y = b * bandHeight;
         const duration = BAND_DURATIONS[b % BAND_DURATIONS.length];
 
         // Deux bandes voisines ne doivent pas montrer la même découpe au même
@@ -244,20 +250,25 @@ export function matrixBackdrop(data) {
         const phase = -((b * duration) / bands).toFixed(1);
 
         const copies = Array.from({ length: copyCount }, (_, i) =>
-            `<use href="#bd-tiles" x="${i * width}" y="${y}"/>`).join("");
-        return `<g class="bd-band" style="--dur:${duration}s;--phase:${phase}s">
-            ${copies}
-        </g>`;
+            `<use href="#bd-tiles" x="${i * width}" y="0"/>`).join("");
+        return `<div class="bd-band" style="--dur:${duration}s;--phase:${phase}s">
+            <svg width="${totalWidth}" height="${bandHeight}"
+                 viewBox="0 0 ${totalWidth} ${bandHeight}">${copies}</svg>
+        </div>`;
     }).join("");
 
     // `--trame` est l'amplitude du défilement : le CSS anime de cette largeur
     // exactement, sans avoir à connaître la géométrie décrite ici.
+    //
+    // La trame ne vit qu'une fois, dans un SVG de définitions que les bandes
+    // reprennent par `<use>` — c'est la technique du sprite, et elle marche entre
+    // deux `<svg>` du même document. Ce conteneur n'est pas en `display:none` :
+    // certains navigateurs cessent alors de résoudre les références.
     return `
         <div class="home-backdrop" aria-hidden="true" data-couvre="${cover}" style="--trame:${width}px">
-            <svg width="${totalWidth}" height="${bandHeight * bands}"
-                 viewBox="0 0 ${totalWidth} ${bandHeight * bands}">
+            <svg class="bd-defs" width="0" height="0" aria-hidden="true" focusable="false">
                 <defs><g id="bd-tiles">${parts.join("")}</g></defs>
-                ${strips}
             </svg>
+            ${strips}
         </div>`;
 }
