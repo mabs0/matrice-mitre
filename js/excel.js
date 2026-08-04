@@ -50,12 +50,44 @@ const dxf = argb => ({ fill: { type: "pattern", pattern: "solid", bgColor: { arg
 function tableau(wb, nom, colonnes) {
     const ws = wb.addWorksheet(nom, { views: [{ state: "frozen", ySplit: 1 }] });
     ws.columns = colonnes;
+    return ws;
+}
 
+/**
+ * Coiffe la ligne d'en-tête, en dernier.
+ *
+ * En dernier parce qu'un style posé sur une colonne s'applique aussi à sa
+ * cellule d'en-tête : styler les colonnes après l'en-tête laissait un bandeau
+ * bariolé, chaque titre héritant de l'alignement de ses données. Ici tous les
+ * titres reçoivent le même traitement, quelle que soit leur colonne.
+ *
+ * La largeur est relevée si le titre n'y tient pas : un mot plus large que sa
+ * colonne n'est pas replié, il est coupé — c'est ce qui tronquait
+ * « Niveau attribué ». La hauteur suit le nombre de lignes nécessaires.
+ */
+function coifferEntete(ws) {
     const tete = ws.getRow(1);
-    tete.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
-    tete.fill = remplir(ENTETE);
-    tete.alignment = { vertical: "middle", wrapText: true };
-    tete.height = 26;
+    let lignes = 1;
+
+    tete.eachCell((cell, col) => {
+        const titre = String(cell.value ?? "");
+        const colonne = ws.getColumn(col);
+
+        // Le plus long mot doit tenir en largeur ; au-delà, on visse un plancher
+        // raisonnable pour que le titre ne s'étale pas sur cinq lignes.
+        const motLePlusLong = Math.max(...titre.split(/\s+/).map(m => m.length), 1);
+        const plancher = Math.max(motLePlusLong + 1, Math.min(titre.length, 11));
+        if ((colonne.width ?? 0) < plancher) colonne.width = plancher;
+
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+        cell.fill = remplir(ENTETE);
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
+        lignes = Math.max(lignes, Math.ceil(titre.length / Math.max(colonne.width - 1, 1)));
+    });
+
+    // Une ligne de texte à 10 points en occupe environ 14.
+    tete.height = 14 * Math.min(lignes, 3) + 7;
     return ws;
 }
 
@@ -116,7 +148,7 @@ export function buildWorkbook(ExcelJS, layer, data, scores, levels) {
     wb.creator = "CTRM";
     wb.created = new Date();
 
-    feuilleReponses(wb, layer);
+    feuilleReponses(wb, layer, levels);
     feuilleMitigations(wb, layer, data, levels);
     feuilleTechniques(wb, data, scores);
     feuilleMatrice(wb, data, scores);
@@ -127,16 +159,23 @@ export function buildWorkbook(ExcelJS, layer, data, scores, levels) {
 
 /* --- Réponses : le contrat de relecture ------------------------------------ */
 
-function feuilleReponses(wb, layer) {
+function feuilleReponses(wb, layer, levels) {
+    // Deux notions de niveau se croisent ici, et les confondre était le défaut de
+    // la version précédente, qui appelait « Niveau attribué » le palier de la
+    // question. « Palier de la question » est le degré d'exigence que *cette*
+    // question mesure ; « Note de la mitigation » est le résultat obtenu, le même
+    // sur toutes les lignes d'une mitigation. C'est la note qu'on cherche quand
+    // on ouvre la feuille, elle est donc là plutôt qu'à aller chercher ailleurs.
     const ws = tableau(wb, RESPONSE_SHEET, [
         { header: "Mitigation", key: "id", width: 12 },
         { header: "Nom", key: "nom", width: 30 },
+        { header: "Note de la mitigation", key: "note", width: 12 },
         { header: "Numéro", key: "num", width: 8 },
-        { header: "Question", key: "question", width: 72 },
+        { header: "Question", key: "question", width: 70 },
+        { header: "Palier de la question", key: "palier", width: 12 },
         { header: "Réponse", key: "reponse", width: 11 },
         { header: "Outil (si applicable)", key: "outil", width: 22 },
-        { header: "Niveau attribué", key: "niveau", width: 9 },
-        { header: "Vérification documentaire", key: "doc", width: 13 },
+        { header: "Vérification documentaire", key: "doc", width: 14 },
         { header: "Références", key: "refs", width: 30 },
         { header: "Répondu le", key: "date", width: 12 },
     ]);
@@ -151,11 +190,12 @@ function feuilleReponses(wb, layer) {
             ws.addRow({
                 id,
                 nom: questionnaire.name,
+                note: levels?.has(id) ? levels.get(id) : "",
                 num: q.num,
                 question: q.text,
+                palier: q.level,
                 reponse: entry?.value || "",
                 outil: entry?.tool || "",
-                niveau: q.level,
                 doc: q.docRequired ? "Oui" : "Non",
                 refs: q.references,
                 date: entry?.at ? entry.at.slice(0, 10) : "",
@@ -165,19 +205,31 @@ function feuilleReponses(wb, layer) {
 
     ws.getColumn("question").alignment = { wrapText: true, vertical: "top" };
     ws.getColumn("refs").alignment = { wrapText: true, vertical: "top" };
-    for (const key of ["num", "niveau", "doc", "reponse"]) {
+    for (const key of ["note", "num", "palier", "doc", "reponse"]) {
         ws.getColumn(key).alignment = { horizontal: "center", vertical: "top" };
     }
+    ws.getColumn("note").font = { bold: true };
     filtrer(ws);
     rayer(ws);
+    coifferEntete(ws);
 
     const derniere = ws.rowCount;
     if (derniere < 2) return ws;
 
+    // Les plages sont dérivées de la clé de colonne, jamais écrites en dur : une
+    // colonne insérée décalait sinon la validation sur la voisine.
+    const plage = key => {
+        const l = ws.getColumn(key).letter;
+        return `${l}2:${l}${derniere}`;
+    };
+
+    // La note se colore comme partout ailleurs.
+    couleursMaturite(ws, plage("note"));
+
     // La colonne des réponses est la seule qu'on retouche à la main dans le
     // classeur : liste fermée pour ne pas y écrire une valeur que l'import
     // ignorerait en silence, et couleur pour la relire d'un coup d'œil.
-    ws.dataValidations.add(`E2:E${derniere}`, {
+    ws.dataValidations.add(plage("reponse"), {
         type: "list",
         allowBlank: true,
         formulae: [`"${ANSWERS.join(",")}"`],
@@ -187,7 +239,7 @@ function feuilleReponses(wb, layer) {
         error: `Valeurs acceptées à la relecture : ${ANSWERS.join(", ")}.`,
     });
     ws.addConditionalFormatting({
-        ref: `E2:E${derniere}`,
+        ref: plage("reponse"),
         rules: ANSWERS.map((valeur, i) => ({
             type: "cellIs", operator: "equal", priority: i + 1,
             formulae: [`"${valeur}"`],
@@ -203,10 +255,10 @@ function feuilleMitigations(wb, layer, data, levels) {
     const ws = tableau(wb, "Mitigations", [
         { header: "ID", key: "id", width: 10 },
         { header: "Mitigation", key: "nom", width: 42 },
-        { header: "Niveau (0-4)", key: "niveau", width: 11 },
-        { header: "Palier atteint", key: "palier", width: 16 },
-        { header: "Questionnaire disponible", key: "dispo", width: 13 },
-        { header: "Techniques couvertes", key: "couvertes", width: 12 },
+        { header: "Note de la mitigation", key: "niveau", width: 12 },
+        { header: "Palier", key: "palier", width: 14 },
+        { header: "Questionnaire disponible", key: "dispo", width: 14 },
+        { header: "Techniques couvertes", key: "couvertes", width: 13 },
     ]);
 
     for (const m of data.mitigations) {
@@ -227,7 +279,11 @@ function feuilleMitigations(wb, layer, data, levels) {
     ws.getColumn("niveau").font = { bold: true };
     filtrer(ws);
     rayer(ws);
-    if (ws.rowCount > 1) couleursMaturite(ws, `C2:C${ws.rowCount}`);
+    coifferEntete(ws);
+    if (ws.rowCount > 1) {
+        const l = ws.getColumn("niveau").letter;
+        couleursMaturite(ws, `${l}2:${l}${ws.rowCount}`);
+    }
     return ws;
 }
 
@@ -273,7 +329,11 @@ function feuilleTechniques(wb, data, scores) {
     ws.getColumn("liste").alignment = { wrapText: true, vertical: "top" };
     filtrer(ws);
     rayer(ws);
-    if (ws.rowCount > 1) couleursMaturite(ws, `D2:D${ws.rowCount}`, { decimal: true });
+    coifferEntete(ws);
+    if (ws.rowCount > 1) {
+        const l = ws.getColumn("score").letter;
+        couleursMaturite(ws, `${l}2:${l}${ws.rowCount}`, { decimal: true });
+    }
     return ws;
 }
 

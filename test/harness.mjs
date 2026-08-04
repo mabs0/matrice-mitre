@@ -1717,10 +1717,57 @@ console.log("\n[32] Mise en forme du classeur");
            etroites.length === 0, `${etroites.length} colonnes trop étroites`);
     }
 
-    /* --- la colonne des réponses : liste fermée et couleur --- */
+    /* --- des en-têtes traités à l'identique, et lisibles --- */
+
+    // Un style posé sur une colonne s'applique aussi à son en-tête : en stylant
+    // les colonnes après l'en-tête, chaque titre héritait de l'alignement de ses
+    // données et le bandeau devenait bariolé.
+    const alignements = new Set();
+    const tronques = [];
+    for (const ws of relu2.worksheets) {
+        if (ws.name === "Métadonnées") continue;      // pas de ligne de titres
+        ws.getRow(1).eachCell((cell, col) => {
+            const a = cell.alignment ?? {};
+            alignements.add(`${a.horizontal}/${a.vertical}/${a.wrapText}`);
+            // Un mot plus large que sa colonne n'est pas replié, il est coupé.
+            const motLePlusLong = Math.max(...String(cell.value ?? "").split(/\s+/).map(m => m.length), 1);
+            const largeur = ws.getColumn(col).width ?? 0;
+            if (largeur < motLePlusLong) tronques.push(`${ws.name}!${cell.address} ${largeur}<${motLePlusLong}`);
+        });
+    }
+    ok("tous les titres de colonne sont traités à l'identique",
+       alignements.size === 1 && [...alignements][0] === "center/middle/true",
+       [...alignements].join(" | "));
+    ok("chaque titre tient dans sa colonne",
+       tronques.length === 0, tronques.slice(0, 4).join(" · "));
+    ok("la ligne de titres est assez haute pour les titres repliés",
+       relu2.worksheets.filter(w => w.name !== "Métadonnées")
+           .every(w => (w.getRow(1).height ?? 0) >= 21),
+       relu2.worksheets.map(w => `${w.name}:${w.getRow(1).height}`).join(" "));
+
+    /* --- la note de la mitigation, là où on la cherche --- */
     const reponses = relu2.getWorksheet(FEUILLE_REPONSES);
-    const validation = reponses.dataValidations?.model?.["E2"]
-        ?? reponses.getCell("E2").dataValidation;
+    const titres = [];
+    reponses.getRow(1).eachCell(c => titres.push(String(c.value)));
+    ok("la feuille Réponses porte la note de la mitigation",
+       titres.includes("Note de la mitigation"), titres.join(" | "));
+    // « Niveau attribué » désignait le palier de la question : le nom laissait
+    // croire à une note obtenue.
+    ok("et distingue le palier de la question de cette note",
+       titres.includes("Palier de la question") && !titres.includes("Niveau attribué"),
+       titres.join(" | "));
+    {
+        const colNote = titres.indexOf("Note de la mitigation") + 1;
+        const notes = new Set();
+        reponses.eachRow((row, i) => { if (i > 1) notes.add(row.getCell(colNote).value); });
+        ok("la note est celle de la mitigation, répétée sur ses lignes",
+           notes.size >= 1 && [...notes].every(v => v === "" || (Number.isInteger(v) && v >= 0 && v <= 4)),
+           [...notes].join(","));
+    }
+
+    /* --- la colonne des réponses : liste fermée et couleur --- */
+    const colReponse = reponses.getColumn(titres.indexOf("Réponse") + 1).letter;
+    const validation = reponses.getCell(`${colReponse}2`).dataValidation;
     ok("la colonne Réponse n'accepte que les valeurs relues",
        validation?.type === "list" &&
        validation.formulae?.[0] === `"${REPONSES.join(",")}"`,
