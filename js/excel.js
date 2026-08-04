@@ -33,6 +33,8 @@ const ENTETE = "FF2A3140";          // bandeau d'en-tête, texte blanc
 const NEUTRE = "FFEFEFEB";          // surface-3 du thème clair
 const GRIS = "FFA8A6A0";            // ce qui n'est pas chiffrable
 const TRAIT = "FFDCDCD5";           // border du thème clair
+const SYNTHESE = "FFE4E4DD";        // fond des lignes qui closent un bloc
+const FILET = "FFB5B5AC";           // leur encadrement
 
 /** Teintes pâles de la colonne des réponses : lisibles derrière du texte. */
 const REPONSE_FONDS = { Oui: "FFDCEFD2", Non: "FFFBD9D3", "N/A": "FFECECE8" };
@@ -73,10 +75,21 @@ function coifferEntete(ws) {
         const titre = String(cell.value ?? "");
         const colonne = ws.getColumn(col);
 
-        // Le plus long mot doit tenir en largeur ; au-delà, on visse un plancher
-        // raisonnable pour que le titre ne s'étale pas sur cinq lignes.
-        const motLePlusLong = Math.max(...titre.split(/\s+/).map(m => m.length), 1);
-        const plancher = Math.max(motLePlusLong + 1, Math.min(titre.length, 11));
+        // Le plus long mot doit tenir en largeur, largement.
+        //
+        // La largeur d'une colonne se compte en caractères de la police par
+        // défaut, alors que les titres sont en gras, et le tableur réserve en
+        // plus une marge de chaque côté ; l'écart réel s'est révélé bien
+        // supérieur à ce qu'un calcul de caractères laisse prévoir — « Numéro »
+        // se coupait encore dans une colonne de 9. Un titre **d'un seul mot**
+        // n'a par ailleurs nulle part où se replier : il est coupé, jamais
+        // réparti, et mérite donc une marge franche. Les titres de plusieurs
+        // mots s'en sortent avec moins, le repli faisant le travail. Le trait
+        // d'union compte comme une coupure possible, le tableur sait y replier.
+        const mots = titre.split(/[\s-]+/).filter(Boolean).map(m => m.length);
+        const motLePlusLong = Math.max(...mots, 1);
+        const marge = mots.length === 1 ? 5 : 3;
+        const plancher = Math.max(motLePlusLong + marge, Math.min(titre.length, 11));
         if ((colonne.width ?? 0) < plancher) colonne.width = plancher;
 
         cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
@@ -91,12 +104,18 @@ function coifferEntete(ws) {
     return ws;
 }
 
-/** Ferme le filtre sur l'étendue réellement remplie. */
+/**
+ * Ferme le filtre sur toute l'étendue remplie, dernière ligne comprise.
+ *
+ * Et non sur la seule ligne d'en-tête : Excel étend alors le filtre à la région
+ * *contiguë*, et les lignes vides qui aèrent les blocs de la feuille Réponses la
+ * coupent — le filtre n'aurait porté que sur le premier bloc.
+ */
 function filtrer(ws) {
     if (ws.rowCount < 2) return;
     ws.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: 1, column: ws.columnCount },
+        to: { row: ws.rowCount, column: ws.columnCount },
     };
 }
 
@@ -108,29 +127,64 @@ function rayer(ws) {
 }
 
 /**
+ * Marque les lignes de synthèse qui closent chaque bloc de questions.
+ *
+ * Elles doivent trancher sans crier : fond gris soutenu, filet au-dessus, gras.
+ * La note y est **peinte** et non conditionnelle — une règle appliquée à une
+ * colonne presque vide colorerait toutes les cellules vides du même coup, et il
+ * n'y a de toute façon rien à retoucher sur une note calculée.
+ *
+ * Appelé après `rayer`, qui poserait sinon sa bordure par-dessus.
+ */
+function habillerSyntheses(ws, syntheses) {
+    for (const { ligne, note } of syntheses) {
+        const row = ws.getRow(ligne);
+        row.eachCell({ includeEmpty: true }, cell => {
+            cell.fill = remplir(SYNTHESE);
+            cell.font = { bold: true, size: 10 };
+            cell.border = {
+                top: { style: "thin", color: { argb: FILET } },
+                bottom: { style: "thin", color: { argb: FILET } },
+            };
+        });
+        const cellule = row.getCell(ws.getColumn("note").number);
+        if (note !== "") {
+            cellule.fill = remplir(RAMPE[note]);
+            cellule.font = { bold: true, size: 11, color: { argb: ENCRE[note] } };
+        } else {
+            cellule.value = "—";
+            cellule.font = { bold: true, size: 10, color: { argb: GRIS } };
+        }
+        cellule.alignment = { horizontal: "center", vertical: "middle" };
+        row.height = 19;
+    }
+}
+
+/**
  * Mise en forme conditionnelle de la maturité.
  *
  * Conditionnelle et non peinte à la main : la couleur suit alors le tri, le
- * filtre et une valeur retouchée. Les niveaux sont des entiers, les scores
- * agrégés des décimaux — d'où deux formes de règle.
+ * filtre et une valeur retouchée.
+ *
+ * Chaque règle est une **expression** et non une comparaison simple, uniquement
+ * pour écarter les cellules vides : dans une comparaison numérique, Excel traite
+ * une cellule vide comme un zéro, et « niveau = 0 » teintait donc en rouge les
+ * mitigations non encore évaluées — les faisant passer pour inexistantes.
+ * La colonne est figée par `$`, la ligne reste relative : c'est ce qui fait
+ * suivre la règle sur toute la plage.
  */
-function couleursMaturite(ws, ref, { decimal = false } = {}) {
-    const rules = [];
-    for (let n = 0; n <= 4; n++) {
-        rules.push(decimal
-            ? {
-                type: "cellIs", operator: "between", priority: n + 1,
-                // Chaque score se rattache au palier dont il est le plus proche.
-                formulae: [n === 0 ? "-0.001" : String(n - 0.5), n === 4 ? "4.001" : String(n + 0.4999)],
-                style: dxf(RAMPE[n]),
-            }
-            : {
-                type: "cellIs", operator: "equal", priority: n + 1,
-                formulae: [String(n)],
-                style: dxf(RAMPE[n]),
-            });
-    }
-    ws.addConditionalFormatting({ ref, rules });
+function couleursMaturite(ws, colonne, premiere, derniere, { decimal = false } = {}) {
+    const cellule = `$${colonne}${premiere}`;
+    const rules = [0, 1, 2, 3, 4].map(n => ({
+        type: "expression",
+        priority: n + 1,
+        formulae: [decimal
+            // Chaque score se rattache au palier dont il est le plus proche.
+            ? `AND(${cellule}<>"",${cellule}>=${n === 0 ? -1 : n - 0.5},${cellule}<${n === 4 ? 5 : n + 0.5})`
+            : `AND(${cellule}<>"",${cellule}=${n})`],
+        style: dxf(RAMPE[n]),
+    }));
+    ws.addConditionalFormatting({ ref: `${colonne}${premiere}:${colonne}${derniere}`, rules });
 }
 
 /* --------------------------------------------------------------- le classeur */
@@ -160,40 +214,49 @@ export function buildWorkbook(ExcelJS, layer, data, scores, levels) {
 /* --- Réponses : le contrat de relecture ------------------------------------ */
 
 function feuilleReponses(wb, layer, levels) {
+    // Les lignes ne portent que ce qui varie d'une question à l'autre. Le nom de
+    // la mitigation et sa note ne sont pas répétés : ils tiennent la ligne de
+    // synthèse qui clôt chaque bloc. L'identifiant, lui, reste sur chaque ligne —
+    // c'est par lui que la relecture rattache une réponse, il ne peut pas
+    // disparaître — mais discret, il n'est là que pour la machine.
+    //
     // Deux notions de niveau se croisent ici, et les confondre était le défaut de
-    // la version précédente, qui appelait « Niveau attribué » le palier de la
-    // question. « Palier de la question » est le degré d'exigence que *cette*
-    // question mesure ; « Note de la mitigation » est le résultat obtenu, le même
-    // sur toutes les lignes d'une mitigation. C'est la note qu'on cherche quand
-    // on ouvre la feuille, elle est donc là plutôt qu'à aller chercher ailleurs.
+    // la version précédente : « Palier de la question » est le degré d'exigence
+    // que *cette* question mesure, « Note » est le résultat obtenu par la
+    // mitigation entière.
     const ws = tableau(wb, RESPONSE_SHEET, [
-        { header: "Mitigation", key: "id", width: 12 },
-        { header: "Nom", key: "nom", width: 30 },
-        { header: "Note de la mitigation", key: "note", width: 12 },
-        { header: "Numéro", key: "num", width: 8 },
-        { header: "Question", key: "question", width: 70 },
+        { header: "Mitigation", key: "id", width: 11 },
+        // « N° » plutôt que « Numéro » : un intitulé court ne peut pas se couper,
+        // et il ne dit rien de moins dans une colonne de numéros. La relecture
+        // accepte les deux, les classeurs déjà exportés restent lisibles.
+        { header: "N°", key: "num", width: 7 },
         { header: "Palier de la question", key: "palier", width: 12 },
+        { header: "Question", key: "question", width: 68 },
         { header: "Réponse", key: "reponse", width: 11 },
-        { header: "Outil (si applicable)", key: "outil", width: 22 },
+        { header: "Outil (si applicable)", key: "outil", width: 20 },
         { header: "Vérification documentaire", key: "doc", width: 14 },
-        { header: "Références", key: "refs", width: 30 },
+        { header: "Références", key: "refs", width: 28 },
         { header: "Répondu le", key: "date", width: 12 },
+        { header: "Note", key: "note", width: 8 },
     ]);
+
+    const syntheses = [];
 
     for (const [id, questionnaire] of layer.catalog) {
         // Réponses résolues : une question commune apparaît renseignée sur
         // chacune des mitigations concernées, ce qui est ce qu'on attend en
         // lisant l'export.
         const entries = resolvedEntries(layer, id);
+        const dates = [];
+
         for (const q of questionnaire.questions) {
             const entry = entries[q.num];
+            if (entry?.at) dates.push(entry.at.slice(0, 10));
             ws.addRow({
                 id,
-                nom: questionnaire.name,
-                note: levels?.has(id) ? levels.get(id) : "",
                 num: q.num,
-                question: q.text,
                 palier: q.level,
+                question: q.text,
                 reponse: entry?.value || "",
                 outil: entry?.tool || "",
                 doc: q.docRequired ? "Oui" : "Non",
@@ -201,16 +264,32 @@ function feuilleReponses(wb, layer, levels) {
                 date: entry?.at ? entry.at.slice(0, 10) : "",
             });
         }
+
+        // La ligne qui clôt le bloc. Elle ne porte aucun numéro de question :
+        // la relecture l'ignore donc d'elle-même, sans avoir à la reconnaître.
+        const note = levels?.has(id) ? levels.get(id) : "";
+        const ligne = ws.addRow({
+            id,
+            question: `${questionnaire.name} — ${questionnaire.questions.length} question`
+                + `${questionnaire.questions.length > 1 ? "s" : ""}`,
+            date: dates.sort().at(-1) ?? "",
+            note,
+        });
+        syntheses.push({ ligne: ligne.number, note });
+        ws.addRow({});                                  // respiration entre deux blocs
     }
 
     ws.getColumn("question").alignment = { wrapText: true, vertical: "top" };
     ws.getColumn("refs").alignment = { wrapText: true, vertical: "top" };
-    for (const key of ["note", "num", "palier", "doc", "reponse"]) {
+    for (const key of ["num", "palier", "doc", "reponse", "date", "note"]) {
         ws.getColumn(key).alignment = { horizontal: "center", vertical: "top" };
     }
-    ws.getColumn("note").font = { bold: true };
+    // L'identifiant n'intéresse que la machine : présent, mais en retrait.
+    ws.getColumn("id").font = { size: 9, color: { argb: GRIS } };
+
     filtrer(ws);
     rayer(ws);
+    habillerSyntheses(ws, syntheses);
     coifferEntete(ws);
 
     const derniere = ws.rowCount;
@@ -222,9 +301,6 @@ function feuilleReponses(wb, layer, levels) {
         const l = ws.getColumn(key).letter;
         return `${l}2:${l}${derniere}`;
     };
-
-    // La note se colore comme partout ailleurs.
-    couleursMaturite(ws, plage("note"));
 
     // La colonne des réponses est la seule qu'on retouche à la main dans le
     // classeur : liste fermée pour ne pas y écrire une valeur que l'import
@@ -281,8 +357,7 @@ function feuilleMitigations(wb, layer, data, levels) {
     rayer(ws);
     coifferEntete(ws);
     if (ws.rowCount > 1) {
-        const l = ws.getColumn("niveau").letter;
-        couleursMaturite(ws, `${l}2:${l}${ws.rowCount}`);
+        couleursMaturite(ws, ws.getColumn("niveau").letter, 2, ws.rowCount);
     }
     return ws;
 }
@@ -331,8 +406,7 @@ function feuilleTechniques(wb, data, scores) {
     rayer(ws);
     coifferEntete(ws);
     if (ws.rowCount > 1) {
-        const l = ws.getColumn("score").letter;
-        couleursMaturite(ws, `${l}2:${l}${ws.rowCount}`, { decimal: true });
+        couleursMaturite(ws, ws.getColumn("score").letter, 2, ws.rowCount, { decimal: true });
     }
     return ws;
 }
@@ -472,8 +546,17 @@ export function readWorkbook(wb, { name } = {}) {
             const col = colonne(nom);
             return col ? texte(ligne.getCell(col).value) : "";
         };
+        // Plusieurs intitulés sont acceptés pour une même colonne : un classeur
+        // exporté avant que « Numéro » devienne « N° » doit continuer à se relire.
+        const lireParmi = (...noms) => {
+            for (const nom of noms) {
+                const col = colonne(nom);
+                if (col) return texte(ligne.getCell(col).value);
+            }
+            return "";
+        };
         const id = lire("Mitigation");
-        const num = Number(lire("Numéro"));
+        const num = Number(lireParmi("N°", "Numéro"));
         const value = lire("Réponse");
         if (!id || !num || !ANSWERS.includes(value)) continue;
         (layer.answers[id] ??= {})[num] = {

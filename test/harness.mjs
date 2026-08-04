@@ -123,6 +123,10 @@ window.alert = () => {};
 window.confirm = () => true;
 window.prompt = () => "";
 globalThis.CryptoJS = CryptoJSmod;
+/* `loadExcel()` rend la bibliothèque déjà posée sur `globalThis` sans rien
+   demander au réseau : on est alors exactement dans l'état du navigateur après
+   son chargement, et le chemin d'import complet devient éprouvable ici. */
+globalThis.ExcelJS = ExcelJS;
 window.CryptoJS = CryptoJSmod;
 
 const fetched = [];
@@ -394,6 +398,20 @@ ok("l'outil survit au passage par Excel", back.answers.M1032[1].tool === "Entra 
     decale.getWorksheet("Réponses").spliceColumns(1, 0, ["Commentaire"]);
     ok("une colonne insérée ne casse pas la relecture",
        progress(readWorkbook(decale, { name: "Décalé" })).answered === 7);
+}
+
+// Un classeur exporté avant que « Numéro » devienne « N° » doit continuer à se
+// relire : les fichiers déjà entre les mains des gens ne se renomment pas.
+{
+    const ancien = new ExcelJS.Workbook();
+    const ws = ancien.addWorksheet("Réponses");
+    ws.addRow(["Mitigation", "Numéro", "Réponse", "Outil (si applicable)"]);
+    ws.addRow(["M1032", 1, "Oui", "Entra ID"]);
+    const repris = readWorkbook(ancien, { name: "Ancien" });
+    ok("un classeur à l'ancien intitulé « Numéro » se relit encore",
+       repris.answers.M1032?.[1]?.value === "Oui" &&
+       repris.answers.M1032?.[1]?.tool === "Entra ID",
+       JSON.stringify(repris.answers));
 }
 
 // Un classeur qui n'est pas le nôtre doit être refusé clairement, et non lu au
@@ -1029,7 +1047,7 @@ ok("une réponse hors questionnaire est écartée",
         if (i === 1) return;
         rows.push({
             Mitigation: row.getCell(colonnes.get("Mitigation")).value,
-            "Numéro": row.getCell(colonnes.get("Numéro")).value,
+            "Numéro": row.getCell(colonnes.get("N°")).value,
             "Réponse": row.getCell(colonnes.get("Réponse")).value,
         });
     });
@@ -1729,10 +1747,14 @@ console.log("\n[32] Mise en forme du classeur");
         ws.getRow(1).eachCell((cell, col) => {
             const a = cell.alignment ?? {};
             alignements.add(`${a.horizontal}/${a.vertical}/${a.wrapText}`);
-            // Un mot plus large que sa colonne n'est pas replié, il est coupé.
-            const motLePlusLong = Math.max(...String(cell.value ?? "").split(/\s+/).map(m => m.length), 1);
+            // Un mot plus large que sa colonne n'est pas replié, il est coupé —
+            // et il faut de la marge : les titres sont en gras, alors que la
+            // largeur se compte en caractères de la police par défaut. Excel sait
+            // replier sur un trait d'union, pas ailleurs.
+            const mots = String(cell.value ?? "").split(/[\s-]+/).map(m => m.length);
+            const requis = Math.max(...mots, 1) + 2;
             const largeur = ws.getColumn(col).width ?? 0;
-            if (largeur < motLePlusLong) tronques.push(`${ws.name}!${cell.address} ${largeur}<${motLePlusLong}`);
+            if (largeur < requis) tronques.push(`${ws.name}!${cell.address} ${largeur}<${requis}`);
         });
     }
     ok("tous les titres de colonne sont traités à l'identique",
@@ -1749,20 +1771,62 @@ console.log("\n[32] Mise en forme du classeur");
     const reponses = relu2.getWorksheet(FEUILLE_REPONSES);
     const titres = [];
     reponses.getRow(1).eachCell(c => titres.push(String(c.value)));
-    ok("la feuille Réponses porte la note de la mitigation",
-       titres.includes("Note de la mitigation"), titres.join(" | "));
+    ok("la feuille Réponses porte la note", titres.includes("Note"), titres.join(" | "));
     // « Niveau attribué » désignait le palier de la question : le nom laissait
     // croire à une note obtenue.
     ok("et distingue le palier de la question de cette note",
        titres.includes("Palier de la question") && !titres.includes("Niveau attribué"),
        titres.join(" | "));
+    // Le nom de la mitigation n'est plus répété sur chaque ligne : il tient la
+    // ligne de synthèse. L'identifiant reste, la relecture en dépend.
+    ok("les lignes ne répètent plus le nom de la mitigation",
+       !titres.includes("Nom") && titres.includes("Mitigation"), titres.join(" | "));
+
+    /* --- la ligne qui clôt chaque bloc --- */
     {
-        const colNote = titres.indexOf("Note de la mitigation") + 1;
-        const notes = new Set();
-        reponses.eachRow((row, i) => { if (i > 1) notes.add(row.getCell(colNote).value); });
-        ok("la note est celle de la mitigation, répétée sur ses lignes",
-           notes.size >= 1 && [...notes].every(v => v === "" || (Number.isInteger(v) && v >= 0 && v <= 4)),
-           [...notes].join(","));
+        const colNote = titres.indexOf("Note") + 1;
+        const colQuestion = titres.indexOf("Question") + 1;
+        const colNum = titres.indexOf("N°") + 1;
+
+        // Une ligne de synthèse se reconnaît à son fond et à l'absence de numéro
+        // de question — c'est cette absence qui fait que la relecture l'ignore.
+        const bloc = [];
+        reponses.eachRow((row, i) => {
+            if (i === 1) return;
+            const fond = row.getCell(colNote).fill?.fgColor?.argb
+                ?? row.getCell(1).fill?.fgColor?.argb;
+            if (!fond || fond === "FFFFFFFF") return;
+            if (row.getCell(colNum).value) return;
+            bloc.push({
+                ligne: i,
+                libelle: String(row.getCell(colQuestion).value ?? ""),
+                note: row.getCell(colNote).value,
+                fondNote: row.getCell(colNote).fill?.fgColor?.argb?.toUpperCase(),
+            });
+        });
+
+        ok("un bloc de questions est clos par une ligne de synthèse",
+           bloc.length === QST.size, `${bloc.length} synthèses pour ${QST.size} mitigations`);
+        ok("elle nomme la mitigation et compte ses questions",
+           bloc.every(b => / — \d+ questions?$/.test(b.libelle)),
+           bloc.find(b => !/ — \d+ questions?$/.test(b.libelle))?.libelle ?? bloc[0]?.libelle);
+        ok("elle porte la note, peinte au palier atteint",
+           bloc.filter(b => Number.isInteger(b.note)).every(b => b.fondNote === RAMPE[b.note]),
+           bloc.filter(b => Number.isInteger(b.note)).slice(0, 3)
+               .map(b => `${b.note}->${b.fondNote}`).join(" "));
+        // Une mitigation non évaluée ne doit pas passer pour un niveau 0.
+        ok("une mitigation non évaluée affiche un tiret, pas un zéro",
+           bloc.filter(b => !Number.isInteger(b.note)).every(b => b.note === "—"),
+           [...new Set(bloc.filter(b => !Number.isInteger(b.note)).map(b => String(b.note)))].join(","));
+
+        // Le défaut trouvé en chemin : dans une comparaison numérique, Excel
+        // traite une cellule vide comme un zéro. Une règle « = 0 » teintait donc
+        // en rouge tout ce qui n'était pas encore évalué.
+        const regles = (relu2.getWorksheet("Mitigations").conditionalFormattings ?? [])
+            .flatMap(p => p.rules);
+        ok("les règles de couleur écartent explicitement les cellules vides",
+           regles.length >= 5 && regles.every(r => /<>""/.test(r.formulae?.[0] ?? "")),
+           regles[0]?.formulae?.[0]);
     }
 
     /* --- la colonne des réponses : liste fermée et couleur --- */
@@ -1824,6 +1888,67 @@ console.log("\n[32] Mise en forme du classeur");
        tete.getCell(1).font?.color?.argb === "FFFFFFFF" &&
        tete.getCell(1).font?.bold === true,
        JSON.stringify({ fill: tete.getCell(1).fill, font: tete.getCell(1).font }));
+
+    /* --- aller-retour à pleine échelle --- */
+
+    // L'aller-retour de la section [9] porte sur une seule mitigation. Ici on
+    // écrit tout le catalogue, on relit les octets produits et on compare réponse
+    // par réponse : c'est ce qui garantit qu'un renommage ou un déplacement de
+    // colonne ne casse pas l'import **en silence** — l'import cherche « Réponse »
+    // et « Outil (si applicable) » par leur intitulé, rien ne l'avertirait de leur
+    // disparition sinon.
+    const complet = createLayer({ name: "Pleine échelle" });
+    let n = 0;
+    for (const [id, questionnaire] of QST) {
+        n++;
+        if (n % 3 === 0) continue;                       // une mitigation sur trois reste vierge
+        const arret = (n * 7) % (questionnaire.questions.length + 1);
+        for (const [k, question] of questionnaire.questions.entries()) {
+            if (k > arret) break;
+            setAnswer(complet, id, question.num, {
+                value: k === arret ? "Non" : "Oui",
+                tool: k === 0 ? "Entra ID" : "",
+            });
+        }
+    }
+
+    const wbComplet = buildWorkbook(ExcelJS, complet, donnees, etats, mitigationLevels(complet));
+    const reluComplet = new ExcelJS.Workbook();
+    await reluComplet.xlsx.load(await wbComplet.xlsx.writeBuffer());
+    const reprise = readWorkbook(reluComplet, { name: "Reprise" });
+
+    const aplat = l => Object.entries(l.answers).flatMap(([id, qs]) =>
+        Object.entries(qs).map(([q, e]) => `${id}/${q}=${e.value}${e.tool ? `|${e.tool}` : ""}`))
+        .sort().join(",");
+    ok("aller-retour à pleine échelle, réponse par réponse",
+       aplat(complet) === aplat(reprise),
+       `${progress(complet).answered} écrites, ${progress(reprise).answered} relues`);
+
+    // Ce qui compte au bout du compte : la matrice doit se recolorer à l'identique.
+    const notesEcrites = mitigationLevels(complet);
+    const notesRelues = mitigationLevels(reprise);
+    const divergentes = [...notesEcrites.keys()]
+        .filter(id => notesEcrites.get(id) !== notesRelues.get(id));
+    ok("et les notes recalculées sont identiques",
+       divergentes.length === 0 && notesEcrites.size > 20,
+       `${notesEcrites.size} notes, ${divergentes.length} divergentes ${divergentes.slice(0, 4).join(" ")}`);
+
+    /* --- le chemin complet de l'interface --- */
+
+    // Jusqu'ici l'aller-retour partait d'un objet en mémoire. Ce qu'un utilisateur
+    // fait vraiment, c'est déposer un fichier : extension reconnue, bibliothèque
+    // demandée, octets relus. Ce chemin-là n'était couvert par rien.
+    const depose = new window.File(
+        [await wbComplet.xlsx.writeBuffer()], "reprise-du-classeur.xlsx",
+        { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const importe = await readLayerFile(depose);
+    ok("un classeur déposé dans l'interface est repris",
+       progress(importe).answered === progress(complet).answered,
+       `${progress(importe).answered} réponses reprises sur ${progress(complet).answered}`);
+    ok("et le layer prend le nom du fichier",
+       importe.name === "reprise-du-classeur", importe.name);
+    ok("les outils saisis reviennent avec",
+       Object.values(importe.answers).some(qs => Object.values(qs).some(e => e.tool === "Entra ID")));
 
     /* --- la bibliothèque n'est pas chargée au démarrage --- */
     const html = readFileSync(`${ROOT}/index.html`, "utf8");
