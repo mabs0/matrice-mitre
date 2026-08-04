@@ -7,7 +7,8 @@
    possible pour inspecter ou retoucher un fichier à la main.
    ========================================================================= */
 
-import { toJSON, fromJSON, fromWorkbook, toWorkbook } from "./layer.js";
+import { toJSON, fromJSON } from "./layer.js";
+import { buildWorkbook, readWorkbook, loadExcel } from "./excel.js";
 import { buildMatrixScores, mitigationLevels } from "./scoring.js";
 import { download, slug } from "./ui.js";
 
@@ -27,11 +28,19 @@ export function exportJSON(layer, passphrase = "") {
     download(`${slug(layer.name)}${suffix}.json`, new Blob([payload], { type: "application/json" }));
 }
 
-export function exportExcel(layer, data) {
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * Écrit le classeur. La bibliothèque n'arrive qu'ici : elle pèse 250 Ko et ne
+ * sert qu'à ce moment-là.
+ */
+export async function exportExcel(layer, data) {
+    const ExcelJS = await loadExcel();
     const levels = mitigationLevels(layer);
     const scores = buildMatrixScores(data, layer);
-    const wb = toWorkbook(layer, data, scores, levels);
-    XLSX.writeFile(wb, `${slug(layer.name)}.xlsx`);
+    const wb = buildWorkbook(ExcelJS, layer, data, scores, levels);
+    const buffer = await wb.xlsx.writeBuffer();
+    download(`${slug(layer.name)}.xlsx`, new Blob([buffer], { type: XLSX_MIME }));
 }
 
 /* ------------------------------------------------------------------ import */
@@ -49,9 +58,10 @@ export async function readLayerFile(file, passphrase = "") {
     const name = file.name.replace(/\.(json|xlsx|xls)$/i, "");
 
     if (/\.(xlsx|xls)$/i.test(file.name)) {
-        const buffer = await file.arrayBuffer();
-        const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
-        return fromWorkbook(wb, { name });
+        const ExcelJS = await loadExcel();
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(await file.arrayBuffer());
+        return readWorkbook(wb, { name });
     }
 
     let text = (await file.text()).trim();

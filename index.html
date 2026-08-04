@@ -68,7 +68,7 @@
             && HTMLScriptElement.supports("importmap");
 
         var modules = [
-            "attack", "catalog", "io", "layer", "main", "scoring",
+            "attack", "catalog", "excel", "io", "layer", "main", "scoring",
             "shared-questions", "theme", "ui",
             "views/home", "views/home-visuals", "views/matrix", "views/quiz",
         ];
@@ -102,7 +102,11 @@
     </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!--
+        La bibliothèque Excel n'est pas chargée ici : elle pèse 250 Ko et ne sert
+        qu'à l'export et à l'import, jamais au démarrage. `js/excel.js` l'appelle
+        au premier besoin. Voir `loadExcel`.
+    -->
 </head>
 <body>
     <!--

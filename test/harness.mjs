@@ -4,7 +4,7 @@
 
 import { JSDOM } from "jsdom";
 import { readFileSync, readdirSync } from "node:fs";
-import * as XLSXmod from "xlsx";
+import ExcelJS from "exceljs";
 import CryptoJSmod from "crypto-js";
 
 import { fileURLToPath } from "node:url";
@@ -97,15 +97,32 @@ for (const key of ["window", "document", "HTMLElement", "Node", "Event", "Custom
                    "getComputedStyle", "requestAnimationFrame", "localStorage", "Blob", "File", "FileReader"]) {
     try { globalThis[key] = window[key]; } catch { /* propriété en lecture seule dans node */ }
 }
+/* jsdom 26.1 n'implémente ni `Blob.text()` ni `Blob.arrayBuffer()` — ni sur un
+   File, ni sur une tranche obtenue par `slice()`. Ce sont des API standard, que
+   tous les navigateurs visés fournissent depuis des années et sur lesquelles
+   l'application s'appuie légitimement : on complète l'environnement de test au
+   lieu de contorsionner le code. `FileReader`, lui, est bien là. */
+{
+    const lire = (blob, forme) => new Promise((resolve, reject) => {
+        const fr = new window.FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = () => reject(fr.error);
+        if (forme === "texte") fr.readAsText(blob);
+        else fr.readAsArrayBuffer(blob);
+    });
+    for (const proto of [window.Blob.prototype, window.File.prototype]) {
+        if (!proto.text) proto.text = function () { return lire(this, "texte"); };
+        if (!proto.arrayBuffer) proto.arrayBuffer = function () { return lire(this, "octets"); };
+    }
+}
+
 globalThis.URL.createObjectURL = () => "blob:fake";
 globalThis.URL.revokeObjectURL = () => {};
 window.matchMedia = () => ({ matches: false, addEventListener() {} });
 window.alert = () => {};
 window.confirm = () => true;
 window.prompt = () => "";
-globalThis.XLSX = XLSXmod;
 globalThis.CryptoJS = CryptoJSmod;
-window.XLSX = XLSXmod;
 window.CryptoJS = CryptoJSmod;
 
 const fetched = [];
@@ -328,7 +345,7 @@ ok("la mitigation sans questionnaire est signalée, pas notée",
 /* -------------------------------------------------------- aller-retour fichier */
 
 console.log("\n[9] Aller-retour export / import");
-const { toJSON, fromJSON, toWorkbook, fromWorkbook, progress } = await import(`${ROOT}/js/layer.js`);
+const { toJSON, fromJSON, progress } = await import(`${ROOT}/js/layer.js`);
 const { buildMatrixScores, mitigationLevels } = await import(`${ROOT}/js/scoring.js`);
 
 // À partir d'ici, CATALOG désigne le catalogue de travail : les mitigations
@@ -344,36 +361,58 @@ ok("JSON relu sans perte", progress(rebuilt).answered === 7);
 ok("l'outil saisi survit à l'aller-retour", rebuilt.answers.M1032[1].tool === "Entra ID");
 ok("le catalogue n'est pas sérialisé", !toJSON(rebuilt).includes('"questions"'));
 
-// Excel : export puis réimport
-const wb = toWorkbook(rebuilt,
-    { version: "19.1", mitigations: [{ id: "M1032", name: "MFA", techniques: ["T1078"] }],
-      tactics: [{ name: "Initial Access", shortname: "initial-access" }],
-      byTactic: new Map([["initial-access", [{ id: "T1078", name: "Valid Accounts" }]]]) },
-    new Map([["T1078", { state: "scored", score: 4 }]]),
+// Excel : export, écriture réelle du fichier, puis réimport depuis les octets.
+// Passer par le buffer et non par l'objet en mémoire est le seul moyen de
+// vérifier que ce qui est *écrit* se relit.
+const { buildWorkbook, readWorkbook } = await import(`${ROOT}/js/excel.js`);
+const fauxData = {
+    version: "19.1",
+    mitigations: [{ id: "M1032", name: "MFA", techniques: ["T1078"] }],
+    tactics: [{ name: "Initial Access", shortname: "initial-access" }],
+    byTactic: new Map([["initial-access", [{ id: "T1078", name: "Valid Accounts" }]]]),
+    subTechniques: [{ id: "T1078.001", name: "Default Accounts" }],
+};
+const wb = buildWorkbook(ExcelJS, rebuilt, fauxData,
+    new Map([["T1078", { state: "scored", score: 4, level: 4, mitigations: [{ id: "M1032", level: 4 }] }]]),
     mitigationLevels(rebuilt));
-ok("classeur à quatre feuilles", wb.SheetNames.join(",") === "Réponses,Mitigations,Matrice,Métadonnées", wb.SheetNames.join(","));
-const back = fromWorkbook(wb, { name: "Relu" });
+ok("classeur à cinq feuilles",
+   wb.worksheets.map(w => w.name).join(",") === "Réponses,Mitigations,Techniques,Matrice,Métadonnées",
+   wb.worksheets.map(w => w.name).join(","));
+
+const octets = await wb.xlsx.writeBuffer();
+const relu = new ExcelJS.Workbook();
+await relu.xlsx.load(octets);
+const back = readWorkbook(relu, { name: "Relu" });
 ok("Excel relu sans perte", progress(back).answered === 7);
 ok("l'outil survit au passage par Excel", back.answers.M1032[1].tool === "Entra ID");
 
+// Les colonnes sont retrouvées par leur intitulé : en insérer une en tête ne
+// doit pas casser la relecture.
+{
+    const decale = new ExcelJS.Workbook();
+    await decale.xlsx.load(octets);
+    decale.getWorksheet("Réponses").spliceColumns(1, 0, ["Commentaire"]);
+    ok("une colonne insérée ne casse pas la relecture",
+       progress(readWorkbook(decale, { name: "Décalé" })).answered === 7);
+}
+
 // Un classeur qui n'est pas le nôtre doit être refusé clairement, et non lu au
 // prix de suppositions sur sa disposition de cellules.
-const foreign = XLSXmod.utils.book_new();
-XLSXmod.utils.book_append_sheet(foreign,
-    XLSXmod.utils.aoa_to_sheet([["Numéro", "Question"], [1, "q1"]]), "M1032");
+const foreign = new ExcelJS.Workbook();
+foreign.addWorksheet("M1032").addRow(["Numéro", "Question"]);
 let refusal = null;
-try { fromWorkbook(foreign, { name: "Étranger" }); } catch (err) { refusal = err.message; }
+try { readWorkbook(foreign, { name: "Étranger" }); } catch (err) { refusal = err.message; }
 ok("un classeur étranger est refusé", refusal !== null, refusal);
 ok("et le message dit ce qui est attendu",
    /Réponses/.test(refusal ?? "") && /exporté par cet outil/.test(refusal ?? ""), refusal);
 
 // Une feuille « Réponses » présente mais vide de réponses exploitables.
-const emptySheet = XLSXmod.utils.book_new();
-XLSXmod.utils.book_append_sheet(emptySheet,
-    XLSXmod.utils.aoa_to_sheet([["Mitigation", "Numéro", "Réponse"], ["M1032", 1, "Peut-être"]]),
-    "Réponses");
+const emptySheet = new ExcelJS.Workbook();
+const vide = emptySheet.addWorksheet("Réponses");
+vide.addRow(["Mitigation", "Numéro", "Réponse"]);
+vide.addRow(["M1032", 1, "Peut-être"]);
 let emptyError = null;
-try { fromWorkbook(emptySheet, { name: "Vide" }); } catch (err) { emptyError = err.message; }
+try { readWorkbook(emptySheet, { name: "Vide" }); } catch (err) { emptyError = err.message; }
 ok("une feuille « Réponses » sans réponse valable est signalée",
    /aucune réponse exploitable/.test(emptyError ?? ""), emptyError);
 
@@ -980,9 +1019,20 @@ ok("une réponse hors questionnaire est écartée",
 {
     const l = createLayer({ name: "export" });
     setAnswer(l, "M1018", 5, { value: "Oui" });
-    const rows = XLSXmod.utils.sheet_to_json(
-        toWorkbook(l, { mitigations: [], tactics: [], techniques: [] }, new Map(), new Map())
-            .Sheets["Réponses"]);
+    const feuille = buildWorkbook(ExcelJS, l,
+        { mitigations: [], tactics: [], techniques: [], subTechniques: [] },
+        new Map(), new Map()).getWorksheet("Réponses");
+    const colonnes = new Map();
+    feuille.getRow(1).eachCell((c, i) => colonnes.set(String(c.value), i));
+    const rows = [];
+    feuille.eachRow((row, i) => {
+        if (i === 1) return;
+        rows.push({
+            Mitigation: row.getCell(colonnes.get("Mitigation")).value,
+            "Numéro": row.getCell(colonnes.get("Numéro")).value,
+            "Réponse": row.getCell(colonnes.get("Réponse")).value,
+        });
+    });
     const seen = ["M1018", "M1026", "M1027"].map(id => {
         const q = groupOf(id, id === "M1026" ? 7 : 5).members.find(m => m.mitigation === id).question;
         return rows.find(r => r.Mitigation === id && r["Numéro"] === q)?.["Réponse"];
@@ -1588,6 +1638,153 @@ console.log("\n[31] Le CSS servi est apparié au document qui le demande");
     // s'expliquer sur une page encore mise en forme.
     ok("rien n'est réécrit en file://, pour garder le message de démarrage lisible",
        /if \(location\.protocol === "file:"\) return;/.test(stamper));
+}
+
+/* ------------------------------------------------ mise en forme du classeur */
+
+console.log("\n[32] Mise en forme du classeur");
+{
+    const { RAMPE } = await import(`${ROOT}/js/excel.js`);
+    const { ANSWERS: REPONSES, LEVEL_LABELS: PALIERS } = await import(`${ROOT}/js/catalog.js`);
+    const FEUILLE_REPONSES = "Réponses";
+
+    // La rampe du classeur doit être celle du thème clair : un classeur a un fond
+    // blanc, la rampe sombre y serait illisible. Elle est recopiée dans le module
+    // — le banc écrit le fichier sans aucun CSS — donc on vérifie qu'elle n'a pas
+    // divergé. Le thème clair est déclaré deux fois dans tokens.css, les deux
+    // sont comparées.
+    const tokens = readFileSync(`${ROOT}/css/tokens.css`, "utf8");
+    const blocsClairs = [
+        /@media \(prefers-color-scheme: light\)[\s\S]*?\n\}/.exec(tokens)?.[0],
+        /:root\[data-theme="light"\][\s\S]*?\n\}/.exec(tokens)?.[0],
+    ];
+    for (const [i, bloc] of blocsClairs.entries()) {
+        const lus = [0, 1, 2, 3, 4].map(n =>
+            new RegExp(`--lvl${n}:\\s*#([0-9a-fA-F]{6})`).exec(bloc ?? "")?.[1]?.toUpperCase());
+        ok(`la rampe du classeur suit le thème clair (bloc ${i + 1})`,
+           lus.join(",") === RAMPE.map(c => c.slice(2)).join(","),
+           `CSS ${lus.join(",")} / classeur ${RAMPE.map(c => c.slice(2)).join(",")}`);
+    }
+
+    /* --- un classeur réaliste, écrit puis relu depuis ses octets --- */
+    const niveaux = new Map([["M1013", 0], ["M1015", 1], ["M1016", 2], ["M1017", 3], ["M1018", 4]]);
+    const donnees = {
+        version: "19.1",
+        mitigations: [...niveaux.keys()].map(id => ({ id, name: `Mitigation ${id}`, techniques: ["T1078"] })),
+        tactics: [
+            { name: "Initial Access", shortname: "initial-access" },
+            { name: "Execution", shortname: "execution" },
+        ],
+        byTactic: new Map([
+            ["initial-access", [{ id: "T1078", name: "Valid Accounts" }, { id: "T1190", name: "Exploit Public-Facing Application" }]],
+            ["execution", [{ id: "T1059", name: "Command and Scripting Interpreter" }]],
+        ]),
+        subTechniques: [{ id: "T1078.001", name: "Default Accounts" }, { id: "T1078.002", name: "Domain Accounts" }],
+    };
+    const etats = new Map([
+        ["T1078", { state: "scored", score: 3.5, level: 4, mitigations: [{ id: "M1018", level: 4 }] }],
+        ["T1190", { state: "unscored", score: null, level: null, mitigations: [{ id: "M1013", level: null }] }],
+        ["T1059", { state: "no-mitigation", score: null, level: null, mitigations: [] }],
+    ]);
+
+    const brut = buildWorkbook(ExcelJS, createLayer({ name: "Mise en forme" }), donnees, etats, niveaux);
+    const relu2 = new ExcelJS.Workbook();
+    await relu2.xlsx.load(await brut.xlsx.writeBuffer());
+
+    /* --- le trio qui rend une feuille utilisable --- */
+    const aPlat = ["Réponses", "Mitigations", "Techniques"];
+    for (const nom of aPlat) {
+        const ws = relu2.getWorksheet(nom);
+        const vue = ws.views?.[0] ?? {};
+        ok(`« ${nom} » garde ses intitulés au défilement`,
+           vue.state === "frozen" && vue.ySplit === 1, JSON.stringify(vue));
+        ok(`« ${nom} » se filtre`, !!ws.autoFilter, JSON.stringify(ws.autoFilter));
+        const sansLargeur = ws.columns.filter(c => !c.width).length;
+        ok(`« ${nom} » a toutes ses colonnes dimensionnées`, sansLargeur === 0, `${sansLargeur} sans largeur`);
+    }
+    // La grille gèle deux lignes : le nom de la tactique et son effectif.
+    ok("la grille garde ses en-têtes de tactique",
+       relu2.getWorksheet("Matrice").views?.[0]?.ySplit === 2);
+    // Une colonne de grille laissée à la largeur par défaut tronquerait le nom de
+    // la technique. ExcelJS regroupe les colonnes de même largeur en une seule
+    // déclaration : on interroge donc chaque colonne, pas la liste.
+    {
+        const grilleWs = relu2.getWorksheet("Matrice");
+        const etroites = donnees.tactics
+            .map((_, i) => grilleWs.getColumn(i + 1).width)
+            .filter(w => !w || w < 20);
+        ok("chaque colonne de la grille est assez large pour son contenu",
+           etroites.length === 0, `${etroites.length} colonnes trop étroites`);
+    }
+
+    /* --- la colonne des réponses : liste fermée et couleur --- */
+    const reponses = relu2.getWorksheet(FEUILLE_REPONSES);
+    const validation = reponses.dataValidations?.model?.["E2"]
+        ?? reponses.getCell("E2").dataValidation;
+    ok("la colonne Réponse n'accepte que les valeurs relues",
+       validation?.type === "list" &&
+       validation.formulae?.[0] === `"${REPONSES.join(",")}"`,
+       JSON.stringify(validation));
+    const mfcReponses = reponses.conditionalFormattings ?? [];
+    ok("et se lit en couleur",
+       mfcReponses.some(f => f.rules.length === REPONSES.length),
+       `${mfcReponses.length} plages`);
+
+    /* --- la maturité en mise en forme conditionnelle --- */
+    for (const [nom, colonne] of [["Mitigations", "C"], ["Techniques", "D"]]) {
+        const ws = relu2.getWorksheet(nom);
+        const plages = ws.conditionalFormattings ?? [];
+        const regles = plages.flatMap(p => p.rules);
+        const couleurs = regles
+            .map(r => r.style?.fill?.bgColor?.argb?.toUpperCase())
+            .filter(Boolean);
+        ok(`« ${nom} » colore la maturité par règle, non à la main`,
+           plages.some(p => p.ref.startsWith(colonne)) && regles.length >= 5,
+           `${regles.length} règles sur ${plages.map(p => p.ref).join(" ")}`);
+        ok(`« ${nom} » emploie exactement la rampe`,
+           RAMPE.every(c => couleurs.includes(c)),
+           couleurs.join(" "));
+    }
+
+    /* --- la grille : peinte, mais jamais muette --- */
+    const grille = relu2.getWorksheet("Matrice");
+    const cellule = grille.getCell(3, 1);        // T1078, score 3,5 -> palier 4
+    ok("la grille peint la case à son palier",
+       cellule.fill?.fgColor?.argb?.toUpperCase() === RAMPE[4],
+       JSON.stringify(cellule.fill));
+    ok("et imprime le score : la couleur ne porte jamais l'information seule",
+       /T1078/.test(String(cellule.value)) && /3,50/.test(String(cellule.value)),
+       String(cellule.value));
+    const sansMitigation = [...Array(6)].map((_, r) => String(grille.getCell(r + 3, 2).value ?? ""));
+    ok("une technique sans mitigation le dit",
+       sansMitigation.some(v => /pas de mitigation/.test(v)), sansMitigation.join(" | "));
+    ok("une technique non évaluée le dit aussi",
+       [...Array(6)].map((_, r) => String(grille.getCell(r + 3, 1).value ?? ""))
+           .some(v => /non évalué/.test(v)));
+
+    // Sans légende, les couleurs sont muettes pour qui reçoit le fichier.
+    const texteGrille = [];
+    grille.eachRow(row => row.eachCell(c => texteGrille.push(String(c.value ?? ""))));
+    ok("la grille porte la légende de l'échelle",
+       texteGrille.some(t => /Échelle de maturité/.test(t)) &&
+       PALIERS.every(l => texteGrille.some(t => t.includes(l))),
+       PALIERS.filter(l => !texteGrille.some(t => t.includes(l))).join(", ") || "tous présents");
+
+    /* --- l'en-tête --- */
+    const tete = reponses.getRow(1);
+    ok("le bandeau d'en-tête est lisible : fond plein, texte blanc",
+       tete.getCell(1).fill?.fgColor?.argb === "FF2A3140" &&
+       tete.getCell(1).font?.color?.argb === "FFFFFFFF" &&
+       tete.getCell(1).font?.bold === true,
+       JSON.stringify({ fill: tete.getCell(1).fill, font: tete.getCell(1).font }));
+
+    /* --- la bibliothèque n'est pas chargée au démarrage --- */
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    ok("la bibliothèque Excel ne pèse pas sur le démarrage",
+       !/<script[^>]*(xlsx|exceljs)[^>]*>/i.test(html));
+    const excelSrc = readFileSync(`${ROOT}/js/excel.js`, "utf8");
+    ok("elle est chargée au premier besoin, et une seule fois",
+       /chargement \?\?=/.test(excelSrc) && /cdnjs[^"]*exceljs/.test(excelSrc));
 }
 
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);

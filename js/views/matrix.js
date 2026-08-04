@@ -266,10 +266,17 @@ function buildExportPanel(app) {
         $("#dd-export").classList.remove("open");
         toast(passphrase ? "Layer exporté en JSON chiffré." : "Layer exporté en JSON en clair.");
     };
-    $("#ex-xlsx").onclick = () => {
-        exportExcel(app.layer, app.data);
+    // L'export Excel attend le chargement de sa bibliothèque : on le dit, plutôt
+    // que de laisser croire à un clic sans effet.
+    $("#ex-xlsx").onclick = async () => {
         $("#dd-export").classList.remove("open");
-        toast("Layer exporté en Excel.");
+        toast("Préparation du classeur…");
+        try {
+            await exportExcel(app.layer, app.data);
+            toast("Layer exporté en Excel.");
+        } catch (err) {
+            toast(`Export Excel impossible : ${err.message}`, "error");
+        }
     };
 }
 
