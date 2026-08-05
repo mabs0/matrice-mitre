@@ -84,7 +84,9 @@ for (const name of sheetNames) {
         const question = {
             num: a,
             level: level === null ? null : Number(level),
-            docRequired: clean(cell(`H${R + 1}`)).toLowerCase() === "oui",
+            // La colonne H du classeur (preuve documentaire attendue) n'est pas
+            // reprise : le questionnaire ne réclame plus de justificatif, seul
+            // l'outil est demandé et il reste facultatif.
             references: clean(cell(`I${R + 1}`)) || "MITRE ATT&CK",
             text: b,
         };
@@ -110,7 +112,7 @@ const q = s => JSON.stringify(s);
 function renderQuestion(x) {
     const lines = [
         `        {`,
-        `            num: ${x.num}, level: ${x.level}, docRequired: ${x.docRequired},`,
+        `            num: ${x.num}, level: ${x.level},`,
     ];
     lines.push(`            references: ${q(x.references)},`);
     lines.push(`            text: ${q(x.text)},`);
@@ -140,11 +142,12 @@ const header = `/* =============================================================
      B1:B3     -> id, name, description
      A7:E7     -> les cinq niveaux          A8:E8 -> bareme[0..4]
      colonne A -> num                       colonne G -> level
-     colonne B -> text                      colonne H -> docRequired
-                                            colonne I -> references
+     colonne B -> text                      colonne I -> references
 
    Les colonnes E (Réponse) et F (Outil) sont saisies par l'utilisateur : elles
-   vivent dans le layer, pas ici.
+   vivent dans le layer, pas ici. La colonne H — preuve documentaire attendue —
+   n'est pas reprise : la seule pièce demandée au répondant est l'outil, et
+   facultativement.
 
    ${mitigations.length} mitigations, ${total} questions. M1055 n'a pas de questionnaire : la
    catégorie décrit les cas où l'on choisit délibérément de ne pas atténuer, il

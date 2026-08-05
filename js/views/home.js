@@ -37,7 +37,7 @@ export function renderHome(app) {
                         une cartographie de votre couverture défensive.
                     </p>
                 </div>
-                ${rosace()}
+                ${rosace(data)}
             </div>
 
             <div class="home-actions">

@@ -10,25 +10,26 @@
    `prefers-reduced-motion`, géré dans home.css.
    ========================================================================= */
 
-import { QUESTIONNAIRES } from "../catalog.js";
 import { esc } from "../ui.js";
 
 /**
  * Profil de maturité illustratif, de l'ordre de ce qu'on observe : une majorité
  * de pratiques informelles à définies, quelques points forts, quelques trous.
  * Fixe, pour que l'accueil ne clignote pas d'un rendu à l'autre.
+ *
+ * Il y a plus de valeurs que de tactiques : le référentiel en a gagné une en
+ * v19 et peut en gagner d'autres, la liste est parcourue de façon cyclique.
  */
-const DEMO_LEVELS = [
-    1, 3, 2, 3, 3, 1, 2, 2, 2, 1, 1, 3, 3, 2, 2, 2, 3, 4, 2, 1, 2,
-    3, 3, 1, 2, 1, 3, 2, 0, 1, 2, 1, 3, 2, 4, 2, 3, 2, 3, 2, 1, 2, 0,
-];
+const DEMO_LEVELS = [2, 3, 1, 2, 3, 1, 2, 2, 0, 3, 2, 1, 3, 2, 1, 2, 4, 2];
 
 /* --------------------------------------------------------------- la rosace */
 
-/* `rMax` laisse la place aux libellés d'axe : le rayon utile s'arrête à 129 et
-   les noms de mitigation occupent la couronne restante, sans sortir du viewBox —
-   une assertion du banc mesure cette marge plutôt que de la supposer. */
-const ROSACE = { size: 320, r0: 34, rMax: 129 };
+/* Le viewBox déborde de la boîte du dessin : `marge` est la couronne, à gauche
+   et à droite, où s'écrivent les noms de tactiques. Les libellés sont posés à
+   l'horizontale, seule façon de les lire d'un coup d'œil, et c'est ce qui coûte
+   cette place — un nom couché tiendrait dans moins, mais se déchiffrerait la
+   tête penchée. Le banc mesure cette marge plutôt que de la supposer. */
+const ROSACE = { size: 320, r0: 30, rMax: 108, marge: 34, ecartLibelle: 9 };
 
 const polar = (cx, cy, r, deg) => {
     const rad = (deg * Math.PI) / 180;
@@ -36,30 +37,56 @@ const polar = (cx, cy, r, deg) => {
 };
 
 /**
- * Rosace de maturité, en toile d'araignée : un rayon par mitigation, un sommet
+ * Découpe un nom de tactique en lignes courtes.
+ *
+ * Les noms d'ATT&CK vont jusqu'à trois mots, et les écrire d'un seul tenant
+ * demanderait une couronne deux fois plus large que le dessin lui-même. Coupés
+ * aux espaces, ils tiennent dans la moitié — et jamais à l'intérieur d'un mot,
+ * qui deviendrait illisible.
+ */
+function lignesDuNom(nom, maxi = 15) {
+    const lignes = [];
+    for (const mot of String(nom).split(/\s+/).filter(Boolean)) {
+        const derniere = lignes.at(-1);
+        if (derniere && `${derniere} ${mot}`.length <= maxi) lignes[lignes.length - 1] = `${derniere} ${mot}`;
+        else lignes.push(mot);
+    }
+    return lignes.length ? lignes : [""];
+}
+
+/**
+ * Rosace de maturité, en toile d'araignée : un rayon par tactique, un sommet
  * par niveau atteint, et le polygone qui les relie.
+ *
+ * Par tactique et non par mitigation : c'est l'axe de lecture d'ATT&CK, celui de
+ * la matrice et celui d'une question de direction — « où sommes-nous faibles ? »
+ * se répond en phases d'attaque, pas en mesures d'atténuation. Quinze rayons se
+ * lisent aussi d'un coup d'œil, là où quarante-trois faisaient une dentelle.
  *
  * C'est la forme d'ensemble qui parle : là où le polygone se creuse, la maturité
  * manque. Chaque rayon est nommé en bout pour qu'on sache *laquelle* se creuse
  * sans avoir à survoler — un geste qui n'existe pas au doigt.
+ *
+ * @param {object} data référentiel ATT&CK normalisé
  */
-export function rosace() {
-    const { size, r0, rMax } = ROSACE;
+export function rosace(data) {
+    const { size, r0, rMax, marge, ecartLibelle } = ROSACE;
     const c = size / 2;
-    const ids = [...QUESTIONNAIRES.keys()];
-    const step = 360 / ids.length;
+    const noms = (data?.tactics ?? []).map(t => t.name);
+    if (!noms.length) return "";
+    const step = 360 / noms.length;
 
     /** Rayon d'un niveau. Le 0 reste visible, sur le cercle intérieur. */
     const radiusOf = level => r0 + ((rMax - r0) * level) / 4;
     const angleOf = i => -90 + i * step;
 
-    // La toile : un rayon par mitigation, et un polygone de repère par palier.
-    const spokes = ids.map((_, i) => {
+    // La toile : un rayon par tactique, et un polygone de repère par palier.
+    const spokes = noms.map((_, i) => {
         const [x, y] = polar(c, c, rMax, angleOf(i));
         return `<line class="ros-spoke" x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
     }).join("");
 
-    const webPoints = r => ids
+    const webPoints = r => noms
         .map((_, i) => polar(c, c, r, angleOf(i)).map(v => v.toFixed(1)).join(","))
         .join(" ");
 
@@ -69,28 +96,31 @@ export function rosace() {
     const ticks = [1, 2, 3, 4].map(level =>
         `<text class="ros-tick" x="${c + 4}" y="${(c - radiusOf(level)).toFixed(1)}">${level}</text>`).join("");
 
-    // Le nom de la mitigation au bout de son rayon.
+    // Le nom de la tactique au bout de son rayon, à l'horizontale.
     //
-    // Chaque libellé est couché dans l'axe de son rayon : c'est ce qui permet
-    // d'en poser 43 sans chevauchement. À 136 px du centre, deux rayons voisins
-    // sont écartés d'une vingtaine de pixels, quand un libellé couché n'occupe
-    // que la hauteur de sa police — posé à l'horizontale, il en faudrait cinq
-    // fois plus. Sur la moitié gauche le texte serait tête en bas : on le
-    // retourne et on l'ancre par la fin, pour qu'il continue de s'éloigner du
-    // centre.
-    const axes = ids.map((id, i) => {
+    // L'ancrage suit le côté : à droite le texte part du rayon vers l'extérieur,
+    // à gauche il s'y termine, en haut et en bas il se centre. C'est ce qui le
+    // fait toujours s'éloigner du dessin au lieu de le recouvrir. Le bloc de
+    // lignes est centré sur le point d'ancrage, sans quoi un nom sur deux lignes
+    // pendrait sous son rayon.
+    const axes = noms.map((nom, i) => {
         const angle = angleOf(i);
-        const [x, y] = polar(c, c, rMax + 4, angle);
-        const turned = ((angle % 360) + 360) % 360;
-        const flip = turned > 90 && turned < 270;
-        const rot = (flip ? angle + 180 : angle).toFixed(1);
-        return `<text class="ros-axis${flip ? " flip" : ""}" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
-                      transform="rotate(${rot} ${x.toFixed(1)} ${y.toFixed(1)})">${esc(id)}</text>`;
+        const [x, y] = polar(c, c, rMax + ecartLibelle, angle);
+        const cos = Math.cos((angle * Math.PI) / 180);
+        const ancre = cos > 0.25 ? "start" : cos < -0.25 ? "end" : "mid";
+        const lignes = lignesDuNom(nom);
+        const depart = -((lignes.length - 1) * 4.6);
+
+        const tspans = lignes.map((ligne, n) =>
+            `<tspan x="${x.toFixed(1)}" dy="${n === 0 ? depart.toFixed(1) : 9.2}">${esc(ligne)}</tspan>`
+        ).join("");
+
+        return `<text class="ros-axis ${ancre}" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${tspans}</text>`;
     }).join("");
 
     // Le tracé de la maturité.
     let sum = 0;
-    const levels = ids.map((_, i) => {
+    const levels = noms.map((_, i) => {
         const level = DEMO_LEVELS[i % DEMO_LEVELS.length];
         sum += level;
         return level;
@@ -110,15 +140,20 @@ export function rosace() {
     const vertices = levels.map((level, i) => {
         const [x, y] = polar(c, c, radiusOf(level), angleOf(i));
         return `<circle class="ros-dot l${level}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
-                        style="--i:${i}"><title>${ids[i]} — niveau ${level}</title></circle>`;
+                        style="--i:${i}"><title>${esc(noms[i])} — niveau ${level}</title></circle>`;
     }).join("");
 
-    const average = (sum / ids.length).toFixed(1).replace(".", ",");
+    const average = (sum / noms.length).toFixed(1).replace(".", ",");
+
+    // Le viewBox est plus large que le dessin, de `marge` de chaque côté : c'est
+    // la couronne où s'écrivent les noms. Il déborde aussi un peu en hauteur, un
+    // libellé sur deux lignes dépassant en haut et en bas du cercle.
+    const vb = `${-marge} -8 ${size + marge * 2} ${size + 16}`;
 
     return `
         <figure class="rosace-figure">
-            <svg class="rosace" viewBox="0 0 ${size} ${size}" role="img"
-                 aria-label="Rosace d'exemple : niveau de maturité des ${ids.length} mitigations évaluables">
+            <svg class="rosace" viewBox="${vb}" role="img"
+                 aria-label="Rosace d'exemple : niveau de maturité sur les ${noms.length} tactiques d'ATT&amp;CK Enterprise">
                 <g class="ros-web-group">${spokes}${webs}</g>
                 <polygon class="ros-shape" points="${shape}" style="--tour:${perimeter.toFixed(0)}"/>
                 <g class="ros-dots">${vertices}</g>
@@ -129,7 +164,7 @@ export function rosace() {
                 <text class="ros-unit" x="${c}" y="${c + 12}">/ 4</text>
             </svg>
             <figcaption>
-                <b>Exemple</b> — un rayon par mitigation, le tracé donne le niveau atteint.
+                <b>Exemple</b> — un rayon par tactique ATT&amp;CK, le tracé donne le niveau atteint.
                 Votre rosace se dessine au fil du questionnaire.
             </figcaption>
         </figure>`;

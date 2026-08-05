@@ -125,15 +125,28 @@ async function boot() {
     const report = (msg, ratio) => {
         const status = $("#boot-status");
         if (status) status.textContent = msg;
-        if (ratio === undefined) return;
+
+        const bar = $("#boot-bar");
+        const pct = $("#boot-pct");
+
+        // Sans ratio, on ne sait pas où l'on en est : la barre reprend son
+        // va-et-vient. Elle gardait sinon l'état « déterminée » pris au premier
+        // rapport et restait figée à 0 % pendant tout le transfert — un
+        // téléchargement qui avance derrière une jauge morte se lit comme un
+        // blocage. C'est ce qui se voit derrière un proxy d'entreprise, qui
+        // relaie le flux sans annoncer sa taille.
+        if (ratio === undefined) {
+            bar?.classList.remove("determinate");
+            if (bar?.firstElementChild) bar.firstElementChild.style.width = "";
+            if (pct) pct.textContent = "";
+            return;
+        }
 
         const percent = Math.round(ratio * 100);
-        const bar = $("#boot-bar");
         if (bar) {
             bar.classList.add("determinate");
             if (bar.firstElementChild) bar.firstElementChild.style.width = `${percent}%`;
         }
-        const pct = $("#boot-pct");
         if (pct) pct.textContent = `${percent} %`;
     };
 

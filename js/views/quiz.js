@@ -11,18 +11,25 @@
 
 import { esc, $, toast } from "../ui.js";
 import { QUESTIONNAIRES, LEVEL_LABELS, getQuestionnaire } from "../catalog.js";
-import { resolvedEntries, sharedText, sharedWith } from "../shared-questions.js";
+import { resolvedEntries, sharedText, sharedWith, answeredElsewhere } from "../shared-questions.js";
 import { mitigationLevel } from "../scoring.js";
 import { setAnswer, progress, questionnaireState, nextTarget, reviewTarget, acquiredMitigations } from "../layer.js";
 
-/** Position courante dans le questionnaire. */
-const cursor = { mitigation: null, index: 0, showResult: false };
+/**
+ * Position courante dans le questionnaire.
+ *
+ * `stoppedBy` retient la question commune dont le « Non », donné ailleurs, a
+ * clos le parcours : sans elle le résultat s'afficherait sans qu'on comprenne
+ * pourquoi il est tombé si tôt.
+ */
+const cursor = { mitigation: null, index: 0, showResult: false, stoppedBy: null };
 
 /** Repart de zéro : appelé quand on charge ou crée un autre layer. */
 export function resetQuiz() {
     cursor.mitigation = null;
     cursor.index = 0;
     cursor.showResult = false;
+    cursor.stoppedBy = null;
 }
 
 export function renderQuiz(app, { mitigation } = {}) {
@@ -60,6 +67,65 @@ function goTo(mitigationId, index, showResult = false) {
     cursor.mitigation = mitigationId;
     cursor.index = Math.max(0, index);
     cursor.showResult = showResult;
+    cursor.stoppedBy = null;
+}
+
+/* ------------------------------------------- questions déjà tranchées ailleurs
+
+   Une question commune n'est posée qu'une fois. Quand on la retrouve dans une
+   autre mitigation, elle est franchie sans être affichée :
+
+     - « Oui » ou « N/A » : on enchaîne sur la suivante, le parcours continue ;
+     - « Non » : le parcours s'arrête, exactement comme si le répondant venait de
+       le donner ici. La règle du questionnaire progressif ne change pas selon
+       l'endroit où la réponse a été saisie — mais l'arrêt serait incompréhensible
+       sans explication, alors le résultat dit d'où il vient.
+*/
+
+/**
+ * Amène le curseur sur la première question qui reste à poser.
+ * @returns {boolean} vrai s'il y a une question à afficher, faux si c'est fini
+ */
+function settleForward(app) {
+    const questions = getQuestionnaire(cursor.mitigation).questions;
+
+    while (cursor.index < questions.length) {
+        const question = questions[cursor.index];
+        const ailleurs = answeredElsewhere(app.layer, cursor.mitigation, question.num);
+        if (!ailleurs) return true;
+
+        if (ailleurs.value === "Non") {
+            cursor.stoppedBy = { num: question.num, others: sharedWith(cursor.mitigation, question.num) };
+            cursor.showResult = true;
+            return false;
+        }
+        cursor.index++;
+    }
+
+    cursor.showResult = true;
+    return false;
+}
+
+/**
+ * Recule d'une question posable, ou reste sur place s'il n'y en a pas avant.
+ * En marche arrière un « Non » emprunté est franchi comme les autres : on
+ * revient sur ses pas, ce n'est pas le moment de clore le parcours.
+ */
+function stepBack(app) {
+    const questions = getQuestionnaire(cursor.mitigation).questions;
+    for (let i = cursor.index - 1; i >= 0; i--) {
+        if (!answeredElsewhere(app.layer, cursor.mitigation, questions[i].num)) {
+            cursor.index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Nombre de questions franchies parce que déjà tranchées ailleurs. */
+function skippedCount(app, questionnaire) {
+    return questionnaire.questions
+        .filter(q => answeredElsewhere(app.layer, questionnaire.id, q.num)).length;
 }
 
 function indexOfQuestion(mitigationId, num) {
@@ -107,6 +173,10 @@ function paint(app) {
     const entries = resolvedEntries(layer, cursor.mitigation);
     const level = mitigationLevel(questionnaire, entries, layer.scoring, layer);
 
+    // Le curseur est recalé à chaque rendu, quel que soit le chemin qui y mène :
+    // c'est ce qui garantit qu'une question tranchée ailleurs n'apparaît jamais,
+    // y compris en revenant sur ses réponses ou en arrivant depuis la matrice.
+    if (!cursor.showResult) settleForward(app);
     if (cursor.showResult) { paintResult(app, questionnaire, level ?? 0); return; }
 
     const total = questionnaire.questions.length;
@@ -115,6 +185,11 @@ function paint(app) {
     const answered = entry?.value ?? null;
     const pct = Math.round((cursor.index / total) * 100);
     const global = progress(layer);
+    // Reculer n'a de sens que s'il reste une question posable en amont : toutes
+    // celles qui précèdent peuvent avoir été franchies.
+    const peutReculer = questionnaire.questions
+        .slice(0, cursor.index)
+        .some(q => !answeredElsewhere(layer, cursor.mitigation, q.num));
 
     $("#view-quiz").innerHTML = `
         <div class="quiz-inner">
@@ -141,7 +216,6 @@ function paint(app) {
             <div class="quiz-card level-${question.level}">
                 <div class="quiz-card-level">
                     Niveau visé : <b>${question.level} — ${esc(LEVEL_LABELS[question.level])}</b>
-                    ${question.docRequired ? ' · <span class="doc-flag">preuve documentaire attendue</span>' : ""}
                 </div>
                 <p class="quiz-question">${esc(sharedText(questionnaire.id, question.num) ?? question.text)}</p>
                 ${sharedNotice(questionnaire.id, question.num)}
@@ -164,7 +238,7 @@ function paint(app) {
             </div>
 
             <div class="quiz-nav">
-                <button class="btn btn-ghost" id="q-back" ${cursor.index === 0 ? "disabled" : ""}>← Précédent</button>
+                <button class="btn btn-ghost" id="q-back" ${peutReculer ? "" : "disabled"}>← Précédent</button>
                 <span class="grow"></span>
                 ${answered ? `<button class="btn btn-sm" id="q-next">Suivant →</button>` : ""}
                 <button class="btn btn-sm" id="q-matrix">Voir la matrice</button>
@@ -179,7 +253,7 @@ function paint(app) {
     $("#q-tool").oninput = e => {
         setAnswer(app.layer, cursor.mitigation, question.num, { tool: e.target.value.trim() });
     };
-    $("#q-back").onclick = () => { if (cursor.index > 0) { cursor.index--; paint(app); } };
+    $("#q-back").onclick = () => { if (stepBack(app)) paint(app); };
     const next = $("#q-next");                 // rendu seulement si la question a une réponse
     if (next) next.onclick = () => advance(app);
     $("#q-matrix").onclick = () => app.show("matrix");
@@ -251,6 +325,7 @@ function answer(app, value) {
 
     // Un « Non » clôt la mitigation : c'est la règle du parcours progressif.
     if (value === "Non") {
+        cursor.stoppedBy = null;               // l'arrêt vient d'ici, pas d'ailleurs
         if (dropped) {
             toast(`${dropped} réponse${dropped > 1 ? "s" : ""} suivante${dropped > 1 ? "s" : ""} effacée${dropped > 1 ? "s" : ""} : le parcours s'arrête ici.`);
         }
@@ -263,9 +338,7 @@ function answer(app, value) {
 }
 
 function advance(app) {
-    const questionnaire = getQuestionnaire(cursor.mitigation);
-    if (cursor.index + 1 >= questionnaire.questions.length) cursor.showResult = true;
-    else cursor.index++;
+    cursor.index++;                 // `paint` recale le curseur et clôt si c'est fini
     paint(app);
 }
 
@@ -280,8 +353,12 @@ function advance(app) {
  * échappatoires, discrètes. Quand il n'y a plus rien à enchaîner, c'est la
  * matrice qui devient l'action principale.
  */
-function resultActions(app, global, target) {
-    const secondary = `<button class="btn btn-ghost btn-sm" id="r-review">Revoir mes réponses</button>`;
+function resultActions(app, global, target, revisitable) {
+    // Rien à revoir quand toutes les questions ont été tranchées ailleurs : le
+    // bouton ne ramènerait qu'ici, sur ce même écran.
+    const secondary = revisitable
+        ? `<button class="btn btn-ghost btn-sm" id="r-review">Revoir mes réponses</button>`
+        : "";
 
     if (!target) {
         return `<div class="result-actions">
@@ -308,6 +385,29 @@ function resultActions(app, global, target) {
     </div>`;
 }
 
+/**
+ * Explique un parcours clos par une question qu'on n'a pas vue passer.
+ *
+ * Sans ce mot, le questionnaire s'arrêterait sans raison apparente — parfois
+ * dès la première question — sur une réponse donnée dans une autre mitigation.
+ */
+function stopNotice(questionnaire) {
+    if (!cursor.stoppedBy) return "";
+
+    const { num, others } = cursor.stoppedBy;
+    const question = questionnaire.questions.find(q => q.num === num);
+    const texte = sharedText(questionnaire.id, num) ?? question?.text ?? "";
+    const liste = others.map(id => `<b>${esc(id)}</b>`).join(" et ");
+
+    return `<p class="quiz-shared" style="text-align:left;">
+        <span class="quiz-shared-icon" aria-hidden="true">⇄</span>
+        Le parcours s'arrête à la question ${num}, commune avec ${liste} : elle y a déjà
+        été répondue « Non », et un « Non » clôt la mitigation. Elle n'a pas été reposée
+        ici, la réponse valant pour toutes.
+        <span style="display:block;margin-top:6px;color:var(--text-mute);">« ${esc(texte)} »</span>
+    </p>`;
+}
+
 function paintResult(app, questionnaire, level) {
     const rounded = Math.round(level);
     const global = progress(app.layer);
@@ -328,6 +428,10 @@ function paintResult(app, questionnaire, level) {
     // terminés, pour entretenir la motivation sur un parcours long.
     const milestone = global.completeMitigations > 0 && global.completeMitigations % 5 === 0;
 
+    // Le décompte des questions non reposées : sans lui, « 8 questions
+    // répondues » après en avoir vu cinq à l'écran ressemble à une erreur.
+    const skipped = skippedCount(app, questionnaire);
+
     $("#view-quiz").innerHTML = `
         <div class="quiz-inner">
             <div class="quiz-result level-${rounded}">
@@ -339,10 +443,13 @@ function paintResult(app, questionnaire, level) {
 
                 <div class="level-track">${levelTrack(level)}</div>
 
+                ${stopNotice(questionnaire)}
+
                 <p class="result-text" style="font-size:0.78rem;color:var(--text-mute);">
                     ${state.answered} question${state.answered > 1 ? "s" : ""} répondue${state.answered > 1 ? "s" : ""}
-                    sur ${questionnaire.questions.length}${state.complete && state.answered < questionnaire.questions.length
+                    sur ${questionnaire.questions.length}${state.complete && state.answered < questionnaire.questions.length && !cursor.stoppedBy
                         ? " — le parcours s'est arrêté sur un « Non »" : ""}
+                    ${skipped ? `· ${skipped} déjà répondue${skipped > 1 ? "s" : ""} depuis une autre mitigation` : ""}
                     · ${global.completeMitigations}/${global.mitigations} mitigation${global.mitigations > 1 ? "s" : ""} traitée${global.completeMitigations > 1 ? "s" : ""}
                     ${milestone ? "<br>Bon moment pour aller voir la matrice se remplir." : ""}
                 </p>
@@ -354,11 +461,17 @@ function paintResult(app, questionnaire, level) {
                             `<li><span class="t-q">Q${t.num}</span> ${esc(t.tool)}</li>`).join("")}</ul>
                     </div>` : ""}
 
-                ${resultActions(app, global, target)}
+                ${resultActions(app, global, target, skipped < questionnaire.questions.length)}
             </div>
         </div>`;
 
-    $("#r-review").onclick = () => { cursor.showResult = false; cursor.index = 0; paint(app); };
+    const review = $("#r-review");
+    if (review) review.onclick = () => {
+        cursor.showResult = false;
+        cursor.index = 0;
+        cursor.stoppedBy = null;
+        paint(app);
+    };
     $("#r-matrix").onclick = () => app.show("matrix");
 
     const nextButton = $("#r-next");

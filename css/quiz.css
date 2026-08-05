@@ -148,7 +148,6 @@
 
 .quiz-card-level { font-size: 0.69rem; color: var(--text-mute); margin-bottom: 12px; }
 .quiz-card-level b { color: var(--text); }
-.doc-flag { color: var(--warn); }
 
 .quiz-question { font-size: 1rem; line-height: 1.5; margin: 0 0 20px; }
 
@@ -166,10 +165,22 @@
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
-.quiz-answer:hover { transform: translateY(-1px); }
-.quiz-answer.yes:hover, .quiz-answer.yes.selected { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface-2)); }
-.quiz-answer.no:hover, .quiz-answer.no.selected { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-2)); }
-.quiz-answer.na:hover, .quiz-answer.na.selected { border-color: var(--text-dim); color: var(--text-dim); background: var(--surface-3); }
+.quiz-answer.yes.selected { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface-2)); }
+.quiz-answer.no.selected { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-2)); }
+.quiz-answer.na.selected { border-color: var(--text-dim); color: var(--text-dim); background: var(--surface-3); }
+
+/* Le survol n'existe qu'au pointeur.
+   Au doigt, le navigateur laisse le dernier élément touché en `:hover` jusqu'au
+   toucher suivant. Comme la question suivante réutilise le bouton qui se trouve
+   au même endroit, elle s'affichait avec une réponse en apparence déjà choisie :
+   la surbrillance était celle du doigt, pas celle d'une réponse enregistrée.
+   `hover: hover` écarte les écrans tactiles, où seul `.selected` colore. */
+@media (hover: hover) {
+    .quiz-answer:hover { transform: translateY(-1px); }
+    .quiz-answer.yes:hover { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--surface-2)); }
+    .quiz-answer.no:hover { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--surface-2)); }
+    .quiz-answer.na:hover { border-color: var(--text-dim); color: var(--text-dim); background: var(--surface-3); }
+}
 
 .quiz-tool { margin-top: 16px; display: flex; flex-direction: column; gap: 5px; }
 .quiz-tool input { width: 100%; }

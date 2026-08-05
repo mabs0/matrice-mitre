@@ -15,9 +15,10 @@
 import { ANSWERS, LEVEL_LABELS } from "./catalog.js";
 import { resolvedEntries } from "./shared-questions.js";
 import { createLayer, sanitiseAnswers } from "./layer.js";
-import { CELL_STATE } from "./scoring.js";
+import { CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "./scoring.js";
 
 const RESPONSE_SHEET = "Réponses";
+const META_SHEET = "Métadonnées";
 
 /* ------------------------------------------------------------------ couleurs
 
@@ -35,6 +36,7 @@ const GRIS = "FFA8A6A0";            // ce qui n'est pas chiffrable
 const TRAIT = "FFDCDCD5";           // border du thème clair
 const SYNTHESE = "FFE4E4DD";        // fond des lignes qui closent un bloc
 const FILET = "FFB5B5AC";           // leur encadrement
+const BARRE = "FF2A78D6";           // accent du thème clair, pour les barres de données
 
 /** Teintes pâles de la colonne des réponses : lisibles derrière du texte. */
 const REPONSE_FONDS = { Oui: "FFDCEFD2", Non: "FFFBD9D3", "N/A": "FFECECE8" };
@@ -187,6 +189,39 @@ function couleursMaturite(ws, colonne, premiere, derniere, { decimal = false } =
     ws.addConditionalFormatting({ ref: `${colonne}${premiere}:${colonne}${derniere}`, rules });
 }
 
+/**
+ * Barre de données dans une colonne de nombres.
+ *
+ * C'est la seule forme de diagramme que ce classeur puisse porter. La
+ * bibliothèque n'écrit aucun graphique — ni histogramme, ni courbe, ni radar :
+ * le format les décrit dans des pièces séparées du fichier, qu'elle ne produit
+ * pas. Coller une image du graphe resterait possible, mais ce serait un dessin
+ * mort : il ne suivrait ni le tri, ni le filtre, ni une valeur retouchée.
+ *
+ * Une barre de données, elle, est une mise en forme conditionnelle comme les
+ * couleurs de maturité. Elle vit dans la cellule, garde le nombre lisible à côté
+ * d'elle, et se recalcule toute seule. `showValue` n'est pas négociable : la
+ * barre s'ajoute au chiffre, elle ne le remplace pas.
+ *
+ * Les priorités partent de 10 : elles ne doivent pas entrer en concurrence avec
+ * celles des règles de couleur, qui occupent 1 à 5.
+ */
+function barres(ws, colonne, premiere, derniere) {
+    ws.addConditionalFormatting({
+        ref: `${colonne}${premiere}:${colonne}${derniere}`,
+        rules: [{
+            type: "dataBar",
+            priority: 10,
+            gradient: false,
+            showValue: true,
+            minLength: 0,
+            maxLength: 88,          // laisse le nombre lisible même au maximum
+            cfvo: [{ type: "num", value: 0 }, { type: "max" }],
+            color: { argb: BARRE },
+        }],
+    });
+}
+
 /* --------------------------------------------------------------- le classeur */
 
 /**
@@ -234,7 +269,6 @@ function feuilleReponses(wb, layer, levels) {
         { header: "Question", key: "question", width: 68 },
         { header: "Réponse", key: "reponse", width: 11 },
         { header: "Outil (si applicable)", key: "outil", width: 20 },
-        { header: "Vérification documentaire", key: "doc", width: 14 },
         { header: "Références", key: "refs", width: 28 },
         { header: "Répondu le", key: "date", width: 12 },
         { header: "Note", key: "note", width: 8 },
@@ -259,7 +293,6 @@ function feuilleReponses(wb, layer, levels) {
                 question: q.text,
                 reponse: entry?.value || "",
                 outil: entry?.tool || "",
-                doc: q.docRequired ? "Oui" : "Non",
                 refs: q.references,
                 date: entry?.at ? entry.at.slice(0, 10) : "",
             });
@@ -281,7 +314,7 @@ function feuilleReponses(wb, layer, levels) {
 
     ws.getColumn("question").alignment = { wrapText: true, vertical: "top" };
     ws.getColumn("refs").alignment = { wrapText: true, vertical: "top" };
-    for (const key of ["num", "palier", "doc", "reponse", "date", "note"]) {
+    for (const key of ["num", "palier", "reponse", "date", "note"]) {
         ws.getColumn(key).alignment = { horizontal: "center", vertical: "top" };
     }
     // L'identifiant n'intéresse que la machine : présent, mais en retrait.
@@ -358,6 +391,10 @@ function feuilleMitigations(wb, layer, data, levels) {
     coifferEntete(ws);
     if (ws.rowCount > 1) {
         couleursMaturite(ws, ws.getColumn("niveau").letter, 2, ws.rowCount);
+        // Le levier de chaque mitigation, en barres : trié sur cette colonne, le
+        // classeur donne à voir où l'effort porte le plus. Une note basse sur une
+        // barre longue, c'est un chantier à ouvrir en premier.
+        barres(ws, ws.getColumn("couvertes").letter, 2, ws.rowCount);
     }
     return ws;
 }
@@ -407,6 +444,9 @@ function feuilleTechniques(wb, data, scores) {
     coifferEntete(ws);
     if (ws.rowCount > 1) {
         couleursMaturite(ws, ws.getColumn("score").letter, 2, ws.rowCount, { decimal: true });
+        // Combien de mitigations couvrent la technique : une case à barre courte
+        // est une technique qui ne tient qu'à un fil.
+        barres(ws, ws.getColumn("nb").letter, 2, ws.rowCount);
     }
     return ws;
 }
@@ -489,7 +529,7 @@ function legende(ws, ligne) {
 /* --- Métadonnées ---------------------------------------------------------- */
 
 function feuilleMetadonnees(wb, layer, data) {
-    const ws = wb.addWorksheet("Métadonnées");
+    const ws = wb.addWorksheet(META_SHEET);
     ws.columns = [{ width: 30 }, { width: 46 }];
 
     const lignes = [
@@ -575,7 +615,42 @@ export function readWorkbook(wb, { name } = {}) {
         );
     }
     layer.answers = sanitiseAnswers(layer.answers);
+    lireMetadonnees(wb, layer);
     return layer;
+}
+
+/**
+ * Reprend du classeur ce qui n'est pas une réponse : le nom de l'évaluation,
+ * le répondant, la méthode de notation.
+ *
+ * Cette lecture est devenue nécessaire le jour où le fichier a cessé de porter
+ * le nom du layer. Sans elle, un aller-retour par le classeur rebaptisait
+ * l'évaluation du nom du fichier et perdait l'organisation — celle-là même qui
+ * nomme le fichier, qui aurait donc changé au réexport.
+ *
+ * La feuille est facultative : un classeur retouché, ou amputé de cet onglet,
+ * reste relisible sur ses seules réponses.
+ */
+function lireMetadonnees(wb, layer) {
+    const ws = wb.getWorksheet(META_SHEET);
+    if (!ws) return;
+
+    const valeurs = new Map();
+    ws.eachRow(row => valeurs.set(texte(row.getCell(1).value), texte(row.getCell(2).value)));
+
+    const nom = valeurs.get("Layer");
+    if (nom) layer.name = nom;
+    layer.respondent = {
+        name: valeurs.get("Répondant") || "",
+        org: valeurs.get("Organisation") || "",
+        email: valeurs.get("Courriel") || "",
+    };
+    // Un mode inconnu — cellule retouchée, classeur d'une version ultérieure —
+    // laisserait la matrice sans notation : on garde alors celui par défaut.
+    const scoring = valeurs.get("Mode de notation");
+    if (scoring && scoring in SCORING_MODES) layer.scoring = scoring;
+    const aggregation = valeurs.get("Mode d'agrégation");
+    if (aggregation && aggregation in AGGREGATION_MODES) layer.aggregation = aggregation;
 }
 
 /**

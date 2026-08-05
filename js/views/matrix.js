@@ -11,7 +11,7 @@ import { esc, $, $$, toast, openModal, closeModal } from "../ui.js";
 import { LEVEL_LABELS, LEVEL_DEFINITIONS, getQuestionnaire } from "../catalog.js";
 import { resolvedEntries } from "../shared-questions.js";
 import { buildMatrixScores, mitigationLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
-import { exportExcel, exportJSON } from "../io.js";
+import { exportExcel, exportJSON, exportName } from "../io.js";
 
 /** État de vue, volontairement hors du layer : ce n'est pas de la donnée d'évaluation. */
 const view = {
@@ -226,6 +226,13 @@ function buildExportPanel(app) {
     // les faiblesses d'un système d'information. L'export en clair reste
     // accessible, mais il faut le demander.
     $("#export-panel").innerHTML = `
+        <div class="field" style="padding:8px 7px 10px;">
+            <label for="ex-org">Organisation <span style="color:var(--text-mute);font-weight:400;">(facultatif)</span></label>
+            <input type="text" id="ex-org" autocomplete="organization"
+                   value="${esc(app.layer.respondent?.org || "")}" placeholder="ex : Acme">
+            <span class="help">Fichier : <code id="ex-name"></code></span>
+        </div>
+        <div class="sep"></div>
         <label class="row" style="align-items:flex-start;">
             <input type="checkbox" id="ex-crypt" checked style="margin-top:2px;">
             <span>
@@ -243,6 +250,18 @@ function buildExportPanel(app) {
         <div class="sep"></div>
         <div class="row" id="ex-json" role="button" tabindex="0"><span>↓</span><span>Exporter en JSON</span></div>
         <div class="row" id="ex-xlsx" role="button" tabindex="0"><span>↓</span><span>Exporter en Excel (.xlsx)</span></div>`;
+
+    // L'organisation est une donnée du layer — elle figure déjà dans les
+    // métadonnées de l'export. On la saisit ici parce que c'est ici qu'elle sert
+    // vraiment : elle nomme le fichier, et l'aperçu montre le nom obtenu avant
+    // de cliquer plutôt qu'après.
+    const org = $("#ex-org");
+    const apercu = () => { $("#ex-name").textContent = `${exportName(app.layer)}.xlsx / .json`; };
+    org.oninput = () => {
+        app.layer.respondent = { ...app.layer.respondent, org: org.value.trim() };
+        apercu();
+    };
+    apercu();
 
     const crypt = $("#ex-crypt");
     const passField = $("#ex-pass-field");
@@ -264,7 +283,8 @@ function buildExportPanel(app) {
         }
         exportJSON(app.layer, passphrase);
         $("#dd-export").classList.remove("open");
-        toast(passphrase ? "Layer exporté en JSON chiffré." : "Layer exporté en JSON en clair.");
+        toast(`${exportName(app.layer)}${passphrase ? "-chiffre" : ""}.json exporté`
+            + `${passphrase ? "" : " — en clair"}.`);
     };
     // L'export Excel attend le chargement de sa bibliothèque : on le dit, plutôt
     // que de laisser croire à un clic sans effet.
@@ -273,7 +293,7 @@ function buildExportPanel(app) {
         toast("Préparation du classeur…");
         try {
             await exportExcel(app.layer, app.data);
-            toast("Layer exporté en Excel.");
+            toast(`${exportName(app.layer)}.xlsx exporté.`);
         } catch (err) {
             toast(`Export Excel impossible : ${err.message}`, "error");
         }

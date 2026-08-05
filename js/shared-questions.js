@@ -116,6 +116,31 @@ export function sharedText(mitigationId, num) {
     return groupOf(mitigationId, num)?.text ?? null;
 }
 
+/**
+ * Cette question a-t-elle déjà été tranchée depuis une autre mitigation ?
+ *
+ * C'est ce qu'il faut savoir avant de l'afficher : reposer mot pour mot une
+ * question déjà répondue use la patience, et la réponse ne pourrait de toute
+ * façon pas différer — elle est unique pour tout le groupe. Le questionnaire
+ * franchit donc ces questions-là au lieu de les poser.
+ *
+ * `askedIn` dit d'où la réponse a été donnée. Il manque sur un fichier antérieur
+ * ou relu depuis un classeur : le porteur du groupe fait alors foi, ce qui
+ * revient à considérer la question comme posée là où elle est rangée.
+ *
+ * @returns {{value: string}|null} l'entrée, ou null s'il faut poser la question
+ */
+export function answeredElsewhere(layer, mitigationId, num) {
+    const group = groupOf(mitigationId, num);
+    if (!group) return null;
+
+    const primary = primaryOf(group);
+    const entry = layer?.answers?.[primary.mitigation]?.[primary.question];
+    if (!entry?.value) return null;
+
+    return (entry.askedIn || primary.mitigation) === mitigationId ? null : entry;
+}
+
 /** Les autres mitigations qui partagent cette question. */
 export function sharedWith(mitigationId, num) {
     const group = groupOf(mitigationId, num);

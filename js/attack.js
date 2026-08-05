@@ -65,7 +65,10 @@ export async function loadAttack(onProgress = () => {}) {
     onProgress("Recherche de la dernière version publiée…");
     const release = await resolveLatest();
 
-    onProgress(`ATT&CK Enterprise v${release.version} — téléchargement…`, 0);
+    // Sans ratio : on ne sait pas encore si la taille à recevoir sera annoncée.
+    // Passer 0 ici affichait une jauge déterminée avant même de savoir qu'on
+    // saurait la remplir.
+    onProgress(`ATT&CK Enterprise v${release.version} — téléchargement…`);
     const text = await fetchWithProgress(release.url, release.version, onProgress);
 
     onProgress("Construction de la matrice…", 1);
@@ -83,8 +86,12 @@ async function fetchWithProgress(url, version, onProgress) {
 
     if (!resp.body?.getReader) return resp.text();      // pas de flux : lecture directe
 
+    // `content-length` n'est pas toujours là : un proxy d'entreprise qui relaie
+    // le flux en le réécrivant le supprime, et il n'y a alors aucune taille à
+    // viser. On rend la main sans ratio, la barre reste indéterminée, et le
+    // compteur d'octets continue de montrer que ça avance.
     const compressed = Number(resp.headers.get("content-length")) || 0;
-    const estimated = compressed * GZIP_RATIO;
+    let estimated = compressed * GZIP_RATIO;
 
     const reader = resp.body.getReader();
     const chunks = [];
@@ -95,6 +102,13 @@ async function fetchWithProgress(url, version, onProgress) {
         if (done) break;
         chunks.push(value);
         received += value.length;
+
+        // L'estimation peut aussi être fausse dans l'autre sens : un
+        // intermédiaire qui décompresse le flux annonce déjà la taille finale,
+        // et la multiplier par le rapport de compression vise six fois trop
+        // haut. Dès qu'on a reçu plus que prévu, on cesse de s'en servir plutôt
+        // que de coincer la jauge à 99 % jusqu'à la fin.
+        if (estimated && received > estimated) estimated = 0;
 
         const mb = (received / 1048576).toFixed(1);
         if (estimated) {

@@ -145,19 +145,19 @@
     dominant-baseline: middle;
 }
 
-/* Nom de la mitigation en bout de rayon. Petit par nécessité — 43 libellés
-   autour de 320 px — mais c'est la seule lecture possible au doigt : il n'y a
-   pas de survol sur un téléphone. La rotation est portée par le markup, elle
-   dépend de l'angle du rayon. */
+/* Nom de la tactique en bout de rayon. C'est la seule lecture possible au
+   doigt : il n'y a pas de survol sur un téléphone. Quinze libellés autour de
+   320 px laissent de quoi les écrire à l'horizontale, chacun ancré du côté où
+   il s'éloigne du dessin — le markup pose la classe, l'angle du rayon décide. */
 .ros-axis {
     fill: var(--text-mute);
     font-family: var(--font);
-    font-size: 6.6px;
-    font-variant-numeric: tabular-nums;
-    text-anchor: start;
+    font-size: 7.4px;
     dominant-baseline: middle;
 }
-.ros-axis.flip { text-anchor: end; }
+.ros-axis.start { text-anchor: start; }
+.ros-axis.end { text-anchor: end; }
+.ros-axis.mid { text-anchor: middle; }
 
 /* Le tracé se dessine d'un trait : le contour est un tiret qui se déroule, et
    le remplissage arrive ensuite. */

@@ -16,6 +16,22 @@ const ENCRYPTED_PREFIX = "CTRM1:";
 
 /* ------------------------------------------------------------------ export */
 
+/**
+ * Nom des fichiers produits.
+ *
+ * Fixe, et suffixé de l'organisation lorsqu'elle est renseignée. Le nom du layer
+ * ne fait pas un bon nom de fichier : il est libre, souvent daté, et il ne dit
+ * pas de quel outil vient le fichier — or c'est la première chose à savoir dans
+ * un dossier de téléchargements. L'organisation, elle, est ce qui distingue deux
+ * évaluations qu'on garde côte à côte.
+ */
+const BASE_NAME = "matrice-mitre";
+
+export function exportName(layer) {
+    const org = layer?.respondent?.org?.trim();
+    return org ? `${BASE_NAME}-${slug(org)}` : BASE_NAME;
+}
+
 export function exportJSON(layer, passphrase = "") {
     let payload = toJSON(layer);
     let suffix = "";
@@ -25,7 +41,7 @@ export function exportJSON(layer, passphrase = "") {
         suffix = "-chiffre";
     }
 
-    download(`${slug(layer.name)}${suffix}.json`, new Blob([payload], { type: "application/json" }));
+    download(`${exportName(layer)}${suffix}.json`, new Blob([payload], { type: "application/json" }));
 }
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -40,7 +56,7 @@ export async function exportExcel(layer, data) {
     const scores = buildMatrixScores(data, layer);
     const wb = buildWorkbook(ExcelJS, layer, data, scores, levels);
     const buffer = await wb.xlsx.writeBuffer();
-    download(`${slug(layer.name)}.xlsx`, new Blob([buffer], { type: XLSX_MIME }));
+    download(`${exportName(layer)}.xlsx`, new Blob([buffer], { type: XLSX_MIME }));
 }
 
 /* ------------------------------------------------------------------ import */

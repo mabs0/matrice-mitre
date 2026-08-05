@@ -6,11 +6,12 @@
      B1:B3     -> id, name, description
      A7:E7     -> les cinq niveaux          A8:E8 -> bareme[0..4]
      colonne A -> num                       colonne G -> level
-     colonne B -> text                      colonne H -> docRequired
-                                            colonne I -> references
+     colonne B -> text                      colonne I -> references
 
    Les colonnes E (Réponse) et F (Outil) sont saisies par l'utilisateur : elles
-   vivent dans le layer, pas ici.
+   vivent dans le layer, pas ici. La colonne H — preuve documentaire attendue —
+   n'est pas reprise : la seule pièce demandée au répondant est l'outil, et
+   facultativement.
 
    44 mitigations, 327 questions. M1055 n'a pas de questionnaire : la
    catégorie décrit les cas où l'on choisit délibérément de ne pas atténuer, il
@@ -54,17 +55,17 @@ const M1013 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.12, NIST PR.DS-5",
             text: "Votre organisation propose-t-elle une formation en sécurité du développement aux développeurs ?",
         },
         {
-            num: 2, level: 3, docRequired: true,
+            num: 2, level: 3,
             references: "ISO 27002 8.25 (Secure development lifecycle), 8.26 (Application security requirements), 8.28 (Secure coding)",
             text: "Votre organisation applique-t-elle un cycle de développement sécurisé (SDLC), incluant des revues de code et des tests de sécurité ?",
         },
         {
-            num: 3, level: 4, docRequired: false,
+            num: 3, level: 4,
             references: "ISO 27002 8.25 (Secure development lifecycle), 8.26 (Application security requirements), 8.28 (Secure coding)",
             text: "Les pratiques de développement sécurisé sont-elles auditées et mises à jour en fonction des nouvelles menaces ?",
         },
@@ -84,42 +85,42 @@ const M1015 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 5.15 / NIST PR.AA-1",
             text: "L'organisation dispose-t-elle d'une infrastructure de gestion centralisée des identités de type Active Directory ou équivalent ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 5.9 / NIST ID.AM-1",
             text: "Les postes de travail et serveurs du système d'information sont-ils rejoints au domaine Active Directory ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.15",
             text: "Les objets Active Directory sont-ils organisés dans des unités organisationnelles ou structurées permettant l'application cohérente de politiques de sécurité ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 8.9 / NIST PR.PT-3",
             text: "Des stratégies de groupe (GPO) sont-elles utilisées pour appliquer des paramètres de configuration et de sécurité aux postes et serveurs ?",
         },
         {
-            num: 5, level: 2, docRequired: true,
+            num: 5, level: 2,
             references: "ISO 27002 5.18",
             text: "Les droits d'accès aux ressources sont-ils attribués principalement via des groupes de sécurité plutôt que directement aux comptes utilisateurs ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27001 7.5",
             text: "L'architecture Active Directory est-elle documentée et maintenue à jour ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.15 / NIST DE.CM-1",
             text: "Les modifications sensibles dans Active Directory (création de comptes, modification de groupes, modification de GPO) sont-elles journalisées ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 8.16 / NIST DE.CM-7",
             text: "Les journaux d'événements Active Directory sont-ils centralisés et analysés (ex : via un SIEM ou une solution de supervision de sécurité) ?",
         },
@@ -140,32 +141,32 @@ const M1016 = {
     contributions: [{ from: "M1049", question: 5, weight: 0.25 }],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.8, NIST PR.IP-12",
             text: "Votre organisation réalise-t-elle des scans de vulnérabilités sur ses systèmes ou applications ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.8, NIST PR.IP-12",
             text: "Les scans de vulnérabilités sont-ils réalisés selon une fréquence définie et adaptée aux risques de l'organisation ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 5.7; NIST DE.CM-8",
             text: "Les scans couvrent-ils à la fois les systèmes internes et les services exposés (DMZ, cloud, applications publiques) ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 5.7, 8.16; NIST DE.CM-8",
             text: "Les scans sont-ils réalisés via un outil automatisé ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 5.7, 8.16; NIST ID.RA-1, ID.RA-2",
             text: "Les résultats des scans de vulnérabilités sont-ils intégrés dans un processus formel de gestion des vulnérabilités et des risques ?",
         },
         {
-            num: 6, level: 4, docRequired: true,
+            num: 6, level: 4,
             references: "ISO 27002 8.8, NIST PR.IP-12",
             text: "Les vulnérabilités critiques sont-elles traitées selon une procédure définie avec délais de remédiation et priorisation des risques ?",
         },
@@ -185,52 +186,52 @@ const M1017 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 6.3, PR.AT-2",
             text: "Votre organisation dispose-t-elle d'un programme de formation en cybersécurité pour ses collaborateurs ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 6.3, PR.AT-2",
             text: "Cette formation est-elle obligatoire pour tous les collaborateurs?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 5.10, PR.AT-2",
             text: "Les formations couvrent-elles les risques liés au phishing, spearphishing et autres techniques d'ingénierie sociale ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 6.3 et 8.5, PR.AT-4",
             text: "La formation inclut-elle des recommandations spécifiques sur la gestion des mots de passe, MFA et les accès non sécurisés ?",
         },
         {
-            num: 5, level: 2, docRequired: false,
+            num: 5, level: 2,
             references: "ISO 27002 6.3, PR.AT-5",
             text: "La formation aborde-t-elle les bonnes pratiques pour éviter les infections via téléchargement de fichiers malveillants ou extensions de navigateur non approuvées ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 6.3",
             text: "La formation est-elle adaptée selon les postes occupés par les collaborateurs (postes pour les employés à haut risque par ex)?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 6.3",
             text: "Une formation sur la cybersécurité est-elle prévue lors du process d'intégration des nouveaux employés?",
         },
         {
-            num: 8, level: 3, docRequired: false,
+            num: 8, level: 3,
             references: "ISO 27002 6.3",
             text: "Les supports de formation sont-ils remis à jour de manière régulière afin d'inclure les nouvelles menaces et techniques utilisées par les adversaires ?",
         },
         {
-            num: 9, level: 4, docRequired: false,
+            num: 9, level: 4,
             references: "ISO 27002 6.3, PR.AT-5",
             text: "Votre organisation effectue-t-elle des simulations de phishing ou d'autres attaques pour tester la vigilance des collaborateurs ?",
         },
         {
-            num: 10, level: 4, docRequired: false,
+            num: 10, level: 4,
             references: "ISO 27002 6.3, PR.AT-4",
             text: "Les résultats des évaluations et simulations sont-ils utilisés pour améliorer les formations ?",
         },
@@ -250,57 +251,57 @@ const M1018 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO/IEC 27002: 5.18 NIST CSF 2.0: PR.AA-01",
             text: "Avez-vous mis en place un processus formel pour la création, la modification et la suppression des comptes utilisateurs ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO/IEC 27002: 5.15 & 8.2 NIST CSF 2.0: PR.AA-05",
             text: "Des exigences relatives à la robustesse, à la non-réutilisation et, lorsque cela est applicable, à la durée de validité des mots de passe sont-elles définies et appliquées ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO/IEC 27002: 5.18 & 8.5 NIST CSF 2.0: PR.AA-05",
             text: "Les utilisateurs disposent-ils uniquement des droits nécessaires à l'exécution de leurs tâches (moindre privilège) ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO/IEC 27002: 5.18 NIST CSF 2.0: PR.AA-03",
             text: "Réalisez-vous des revues périodiques des comptes utilisateurs et à privilèges afin de vérifier leur légitimité et leurs droits ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO/IEC 27002: 5.17 & 8.2 NIST CSF 2.0: PR.AA-05",
             text: "L'authentification multifacteur (MFA) est-elle activée pour les comptes à privilèges ou sensibles ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO/IEC 27002: 5.18 & 8.2 NIST CSF 2.0: PR.AA-05",
             text: "Les comptes inactifs sont-ils automatiquement désactivés après une période définie ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO/IEC 27002: 5.17 & 8.5 NIST CSF 2.0: PR.AA-05",
             text: "Les comptes sont-ils verrouillés après un nombre défini d'échecs d'authentification ?",
         },
         {
-            num: 8, level: 3, docRequired: false,
+            num: 8, level: 3,
             references: "réf. ISO 27002 5.17",
             text: "Les comptes de service disposent-ils de mots de passe complexes et uniques, et leur usage est-il restreint aux systèmes et tâches autorisés ?",
         },
         {
-            num: 9, level: 4, docRequired: false,
+            num: 9, level: 4,
             references: "ISO/IEC 27002: 5.17 & 8.5 NIST CSF 2.0: PR.AA-05",
             text: "Les connexions automatiques et liées des comptes à privilèges sont-elles limitées à des postes ou à des environnements spécifiques ?",
         },
         {
-            num: 10, level: 4, docRequired: false,
+            num: 10, level: 4,
             references: "MITRE ATT&CK",
             text: "L'authentification multifacteur est-elle déployée pour l'ensemble des utilisateurs lorsque cela est applicable ?",
         },
         {
-            num: 11, level: 4, docRequired: true,
+            num: 11, level: 4,
             references: "ISO/IEC 27002: 5.15 & 8.2",
             text: "Des audits périodiques permettent-ils de vérifier l'efficacité de la gestion des comptes, la légitimité des droits attribués et la présence éventuelle de comptes inactifs ou orphelins ?",
         },
@@ -320,32 +321,32 @@ const M1019 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 5.1 et 5.7, NIST ID.RA-2",
             text: "Votre organisation dispose-t-elle d'un programme de renseignement sur les menaces ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 5.6, 5.7, NIST ID.BE-5",
             text: "Le programme s'appuie-t-il sur des sources externes de threat intelligence (CERT, fournisseurs, open-source, etc.) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 5.6, 5.7, NIST ID.RA-3",
             text: "Des informations sont-elles collectées régulièrement (veille automatisée, alertes, bulletins) ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 5.6, 5.24 NIST ID.RA-3",
             text: "Les données de CTI sont-elles analysées et contextualisées pour l'organisation, en tenant compte des menaces sectorielles, des TTP adverses et des vulnérabilités critiques ou zero-day ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 5.7, 8.16, NIST ID.RA-2",
             text: "Les menaces issues du programme CTI sont-elles intégrées dans les outils ou processus de détection (SIEM, EDR, SOC) ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 5.6, 5.25, NIST RS.MI-3",
             text: "Les résultats sont-ils partagés dans des structures externes (CERT, secteur, autorité nationale, partenaires) ?",
         },
@@ -365,42 +366,42 @@ const M1020 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.20",
             text: "L'organisation dispose-t-elle d'un équipement de sécurité réseau capable d'inspecter le trafic SSL/TLS (proxy, pare-feu nouvelle génération, passerelle de sécurité, WAF, etc.) ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "NIST DE.CM-1",
             text: "Les flux réseau sortants (ex : navigation web) sont-ils centralisés via cet équipement de sécurité ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 8.20",
             text: "L'inspection SSL/TLS est-elle activée sur les flux réseau sortants, lorsque cela est pertinent pour l'organisation ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 8.20",
             text: "L'inspection SSL/TLS est-elle activée sur les flux réseau entrants (services exposés, reverse proxy, WAF, etc.), lorsque cela est pertinent pour l'organisation ?",
         },
         {
-            num: 5, level: 2, docRequired: true,
+            num: 5, level: 2,
             references: "ISO 27001 7.5",
             text: "Le périmètre des flux faisant l'objet d'une inspection SSL/TLS est-il défini et documenté ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 8.26",
             text: "Les certificats nécessaires à l'inspection SSL/TLS sont-ils déployés et gérés de manière centralisée ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 5.36",
             text: "Les règles d'inspection SSL/TLS sont-elles revues régulièrement afin de garantir leur adéquation avec les usages et les contraintes applicatives ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "NIST DE.CM-1 à DE.CM-7",
             text: "Les alertes issues de l'inspection SSL/TLS sont-elles analysées dans le cadre de la supervision de sécurité (SOC, SIEM ou équivalent) ?",
         },
@@ -420,52 +421,52 @@ const M1021 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.20",
             text: "L'organisation dispose-t-elle d'une solution de filtrage web (proxy sécurisé, passerelle web sécurisée ou équivalent) permettant de contrôler les accès Internet des utilisateurs ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 8.2",
             text: "Les accès Web sont-ils authentifiés afin d'identifier les activités de navigation ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.7 / 8.20",
             text: "La solution de filtrage Web bloque-t-elle l'accès aux sites identifiés comme malveillants ou appartenant à des catégories jugées à risque ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.20",
             text: "Les flux web sortants (HTTP et HTTPS) sont-ils contrôlés par la solution de filtrage ?",
         },
         {
-            num: 5, level: 2, docRequired: true,
+            num: 5, level: 2,
             references: "ISO 27002 8.7",
             text: "Des politiques de contrôle des téléchargements (types de fichiers autorisés ou interdits) sont-elles appliquées aux contenus téléchargés depuis Internet ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27002 8.9",
             text: "Les listes de blocage et les bases de réputation utilisées par la solution de filtrage web sont-elles mises à jour automatiquement ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 8.20",
             text: "Les contrôles de filtrage web couvrent-ils également les services web interactifs (ex : webmail, services de partage de fichiers ou applications cloud) ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 8.15",
             text: "Les tentatives d'accès à des contenus bloqués sont-elles journalisées ?",
         },
         {
-            num: 9, level: 4, docRequired: true,
+            num: 9, level: 4,
             references: "ISO 27002 8.16",
             text: "Les journaux ou alertes liés aux accès web bloqués sont-ils analysés afin d'identifier des comportements suspects ou des menaces potentielles ?",
         },
         {
-            num: 10, level: 4, docRequired: true,
+            num: 10, level: 4,
             references: "ISO 27002 5.36",
             text: "Les politiques de filtrage Web sont-elles revues périodiquement afin de s'adapter aux nouveaux usages et aux évolutions des menaces ?",
         },
@@ -485,57 +486,57 @@ const M1022 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 5.15 / 8.2",
             text: "Le principe du moindre privilège est-il appliqué lors de l'attribution des droits d'accès aux fichiers et répertoires ?",
         },
         {
-            num: 2, level: 1, docRequired: true,
+            num: 2, level: 1,
             references: "ISO 27002 5.18",
             text: "Les accès aux fichiers et répertoires sont-ils attribués principalement via des groupes plutôt que directement aux utilisateurs ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 8.2",
             text: "Les permissions inutiles (notamment les droits d'écriture ou d'exécution) sont-elles supprimées sur les ressources sensibles ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.3",
             text: "Les systèmes de fichiers et les partages réseau utilisent-ils des mécanismes de contrôle d'accès (ACL, NTFS, POSIX ou équivalent) pour restreindre les accès ?",
         },
         {
-            num: 5, level: 2, docRequired: false,
+            num: 5, level: 2,
             references: "Mitre Att&ck",
             text: "Les répertoires système ou applicatifs critiques sont-ils protégés contre les modifications par des utilisateurs non autorisés ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27002 8.15",
             text: "Une politique ou des règles formalisées définissent-elles la gestion des permissions des fichiers et répertoires ?",
         },
         {
-            num: 7, level: 3, docRequired: true,
+            num: 7, level: 3,
             references: "ISO 27002 8.15",
             text: "Les modifications de permissions ou les accès à des fichiers sensibles sont-ils journalisés sur les systèmes concernés ?",
         },
         {
-            num: 8, level: 3, docRequired: true,
+            num: 8, level: 3,
             references: "ISO 27002 5.18",
             text: "Les droits d'accès aux fichiers et répertoires sensibles font-ils l'objet de revues périodiques ou de contrôles automatisés permettant d'identifier les permissions excessives, obsolètes ou non conformes ?",
         },
         {
-            num: 9, level: 4, docRequired: false,
+            num: 9, level: 4,
             references: "Mitre Att&ck",
             text: "Des mécanismes automatisés permettent-ils d'identifier les permissions excessives, les partages trop permissifs ou les dérives des droits d'accès sur les systèmes de fichiers ?",
         },
         {
-            num: 10, level: 4, docRequired: true,
+            num: 10, level: 4,
             references: "Mitre Att&ck",
             text: "Des mécanismes de contrôle d'intégrité des fichiers (FIM) sont-ils utilisés pour détecter les modifications non autorisées de fichiers critiques ?",
         },
         {
-            num: 11, level: 4, docRequired: true,
+            num: 11, level: 4,
             references: "ISO 27002 8.16",
             text: "Des alertes sont-elles générées et analysées en cas de modification suspecte des permissions ou des fichiers sensibles ?",
         },
@@ -555,42 +556,42 @@ const M1024 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO/IEC 27001: 5.15 & 8.2",
             text: "Les utilisateurs standards (sans privilèges) ne peuvent pas modifier les clés de registre système (ou les éléments de configuration système équivalents sous Linux/macOS).",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO/IEC 27001: 5.1",
             text: "Les règles concernant la modification des clés de registre (ou des éléments de configuration système équivalents) sont formalisées dans une politique.",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO/IEC 27001: 5.1",
             text: "La politique concernant la gestion des modifications des clés de registre est revue régulièrement.",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO/IEC 27001: 5.1",
             text: "Existe-t-il un processus permettant de gérer les exceptions à cette politique ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO/IEC 27001: 5.2 & 8.9",
             text: "Les modifications critiques des clés de registre sont-elles soumises à un processus formalisé d'approbation avant leur mise en œuvre ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO/IEC 27001: 8.16",
             text: "Les permissions des clés de registre (ou des éléments de configuration système équivalents) sont-elles vérifiées régulièrement ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO/IEC 27001: 8.16",
             text: "Les modifications non autorisées des clés de registre système (ou des éléments de configuration système équivalents) sont-elles détectées automatiquement ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO/IEC 27001: 8.15",
             text: "Existe-t-il une traçabilité complète des modifications des clés de registre système (identité, date, élément concerné et modification réalisée) ?",
         },
@@ -610,37 +611,37 @@ const M1025 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "Mitre Attack",
             text: "Les systèmes utilisent-ils des mécanismes de protection mémoire (ex : DEP, ASLR, CFG) pour limiter l'exploitation des processus privilégiés ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 8.9",
             text: "Tous les processus ou services critiques sont-ils identifiés et protégés contre les modifications non autorisées ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "Mitre Attack",
             text: "Les exécutables utilisés par les processus privilégiés sont-ils signés ou vérifiés afin de garantir leur intégrité ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "Mitre Attack",
             text: "Des mécanismes de protection du noyau ou de contrôle d'accès système (PatchGuard, SELinux, AppArmor...) sont-ils utilisés ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "Mitre Attack",
             text: "Une solution de protection des endpoints (EDR, EPP ou équivalent) est-elle configurée pour détecter ou empêcher les tentatives de manipulation des processus privilégiés ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "Mitre Attack",
             text: "Les tentatives de modification ou d'injection de code dans les processus privilégiés génèrent-elles automatiquement une alerte de sécurité ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.16",
             text: "Les événements liés aux tentatives de manipulation des processus privilégiés sont-ils centralisés, corrélés,analysés et investigués dans le cadre de la supervision de sécurité (SOC/SIEM) ?",
         },
@@ -660,72 +661,72 @@ const M1026 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 : 5.15, 8.2 NIST : PR.AC-4, PR.AC-6",
             text: "Les utilisateurs non administrateurs ont un compte standard (sans privilèges).",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "MITRE ATT&CK",
             text: "Les mots de passe des comptes à privilèges sont-ils longs (≥16 caractères), uniques, gérés via un coffre-fort (PAM/vault) et changés uniquement en cas de compromission ou de départ ?",
         },
         {
-            num: 3, level: 1, docRequired: true,
+            num: 3, level: 1,
             references: "ISO 27002 : 5.17, 8.3 NIST : PR.AC-1, PR.AC-7",
             text: "Des exigences de robustesse des mots de passe sont-elles définies et formalisées pour les comptes à privilèges ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 : 5.1, 5.15 NIST : ID.GV-1, PR.AC-1",
             text: "Les règles de gestion des comptes à privilèges sont-elles définies dans une politique formalisée ?",
         },
         {
-            num: 5, level: 2, docRequired: true,
+            num: 5, level: 2,
             references: "ISO 27002 : 5.1, 5.36 NIST : ID.GV-3",
             text: "La politique de gestion des comptes à privilèges est-elle revue périodiquement ?",
         },
         {
-            num: 6, level: 2, docRequired: false,
+            num: 6, level: 2,
             references: "ISO 27002 : 5.15, 8.2 NIST : PR.AC-6",
             text: "Les administrateurs disposent-ils également d'un compte standard et utilisent-ils leur compte à privilèges uniquement pour les tâches d'administration ?",
         },
         {
-            num: 7, level: 2, docRequired: false,
+            num: 7, level: 2,
             references: "ISO 27002 : 8.5 NIST : PR.AC-7",
             text: "L'authentification multifacteur (MFA) est-elle obligatoire pour la connexion aux comptes à privilèges ?",
         },
         {
-            num: 8, level: 2, docRequired: true,
+            num: 8, level: 2,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.AE-3, PR.PT-1",
             text: "Existe-t-il une traçabilité complète des comptes à privilèges (création, modification, suppression, utilisation) ?",
         },
         {
-            num: 9, level: 2, docRequired: true,
+            num: 9, level: 2,
             references: "ISO 27002 : 5.18, 5.15 NIST : PR.AC-4",
             text: "Une revue périodique des comptes à privilèges (inventaire, suppression des comptes obsolètes, mise à jour des droits) est-elle réalisée ?",
         },
         {
-            num: 10, level: 3, docRequired: false,
+            num: 10, level: 3,
             references: "ISO 27002 : 5.15, 8.2 NIST : PR.AC-5, PR.AC-6",
             text: "Un modèle de séparation des niveaux d'administration (Tiering, PAW ou équivalent) est-il mis en œuvre ?",
         },
         {
-            num: 11, level: 3, docRequired: false,
+            num: 11, level: 3,
             references: "ISO 27002 : 8.18, 8.5 NIST : PR.AC-6, PR.PT-3",
             text: "Une solution de PAM (Bastion ou équivalent) est-elle utilisée pour administrer les ressources sensibles ?",
         },
         {
-            num: 12, level: 3, docRequired: true,
+            num: 12, level: 3,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.AE-3, PR.PT-1",
             text: "Les actions réalisées via les comptes à privilèges sont-elles journalisées et auditées ?",
         },
         {
-            num: 13, level: 4, docRequired: false,
+            num: 13, level: 4,
             references: "ISO 27002 : 8.1, 8.2 NIST : PR.AC-6, PR.PT-3",
             text: "L'utilisation des comptes à privilèges est-elle limitée à des postes d'administration dédiés ?",
         },
         {
-            num: 14, level: 4, docRequired: false,
+            num: 14, level: 4,
             references: "ISO 27002 : 8.16 NIST : DE.AE-2, DE.CM-1",
             text: "Des mécanismes permettent-ils de détecter automatiquement les comportements anormaux des comptes à privilèges ?",
         },
@@ -745,42 +746,42 @@ const M1027 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 5.17",
             text: "L'organisation dispose-t-elle d'une politique formelle définissant les règles de gestion des mots de passe ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 5.17",
             text: "Des exigences minimales de longueur ainsi que des mécanismes empêchant l'utilisation de mots de passe faibles, triviaux ou compromis sont-ils définis et appliqués dans les systèmes d'authentification ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.17",
             text: "L'utilisation d'une solution de gestion sécurisée des mots de passe (coffre-fort ou équivalent) est-elle intégrée à l'organisation et à sa politique de sécurité ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.2",
             text: "Les règles de gestion des mots de passe sont-elles appliquées de manière centralisée via les systèmes d'authentification ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.5",
             text: "L'authentification multifacteur (MFA) est-elle activée pour les comptes à privilèges ou sensibles ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27001 9.2",
             text: "Les politiques de mots de passe font-elles l'objet de contrôles ou d'audits afin de vérifier leur bonne application ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 5.36",
             text: "Les politiques de mots de passe sont-elles revues régulièrement afin de s'adapter à l'évolution des menaces et des recommandations de sécurité ?",
         },
         {
-            num: 8, level: 4, docRequired: false,
+            num: 8, level: 4,
             references: "Mitre Att&ck",
             text: "Les systèmes d'authentification empêchent-ils l'utilisation de mots de passe compromis, triviaux ou figurant dans des listes de mots de passe interdits ?",
         },
@@ -800,42 +801,42 @@ const M1028 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27001 8.2 et 8.3",
             text: "Les utilisateurs standards (sans privilèges) ne sont pas en mesure de modifier la configuration du système sur leur poste.",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27001 5.1 et 8.9",
             text: "La liste des configurations système par défaut est définie.",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27001 5.1 et 8.9",
             text: "Les règles concernant les configurations système sont formalisées dans une politique.",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27001 5.1 et 5.36",
             text: "La politique concernant les configurations système est revue régulièrement.",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27001 8.9 et 8.32",
             text: "Le processus de validation des configurations système par défaut est formalisé.",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27001 5.36, 8.9",
             text: "La liste des configurations système par défaut est revue régulièrement.",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27001 8.9, 8.16",
             text: "Les configurations système différentes des valeurs par défaut sont détectées automatiquement.",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27001 8.15, 8.16 et 8.32",
             text: "Il existe une traçabilité complète des modifications des configurations système sur les équipements (qui, quand, configuration concernée, modification apportée).",
         },
@@ -855,37 +856,37 @@ const M1029 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 8.13",
             text: "Des sauvegardes des données sensibles sont-elles réalisées vers un système distinct de l'environnement de production ?",
         },
         {
-            num: 2, level: 1, docRequired: true,
+            num: 2, level: 1,
             references: "ISO 27002 8.24",
             text: "Les sauvegardes de données sensibles sont-elles chiffrées avec une gestion des clés séparée ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.15",
             text: "Les journaux de sécurité des systèmes (endpoints, serveurs) sont-ils centralisés et stockés sur un système indépendant ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 8.13",
             text: "Des tests de restauration des sauvegardes sont-ils réalisés régulièrement sur des jeux de données représentatifs ?",
         },
         {
-            num: 5, level: 2, docRequired: false,
+            num: 5, level: 2,
             references: "ISO 27002 8.15",
             text: "Les journaux des équipements de sécurité (IDS/IPS, pare-feu, etc.) sont-ils également centralisés ou sauvegardés sur un système indépendant ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 8.13",
             text: "Des mécanismes de sauvegarde immuable ou de protection contre la suppression ou modification des sauvegardes sont-ils mis en place ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.13",
             text: "Des mécanismes automatisés permettent-ils de superviser les sauvegardes (alertes en cas d'échec, vérification d'intégrité, tableaux de bord de suivi) ?",
         },
@@ -905,42 +906,42 @@ const M1030 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.22, NIST PR.AC-5",
             text: "Votre organisation a-t-elle mis en place une segmentation réseau pour protéger les systèmes critiques ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 5.1, 8.20, NIST PR.AC-4",
             text: "Les règles de segmentation sont-elles formalisées dans une politique de sécurité ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.22, NIST PR.AC-5",
             text: "Les différents environnements du système d'information (utilisateurs, serveurs, systèmes critiques, services exposés, etc.) sont-ils segmentés en zones réseau distinctes selon leur niveau de sensibilité ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 8.20, 8.21, NIST PR.PT-4",
             text: "Les flux entre les différentes zones réseau sont-ils strictement contrôlés par des mécanismes de filtrage (pare-feu, ACL ou équivalent) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.16, 8.20 NIST PR.PT-3",
             text: "Les connexions entre segments réseau sont-elles surveillées pour détecter des anomalies ou des accès non autorisés ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 8.16, 8.21, NIST DE.AE-1",
             text: "Disposez-vous d'un mécanisme de surveillance en temps réel des activités réseau (SIEM, IDS, NDR) ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 5.36 NIST DE.CM-7",
             text: "Effectuez-vous des tests réguliers de l'efficacité de votre segmentation (ex. : audits, scans de conformité) ?",
         },
         {
-            num: 8, level: 4, docRequired: false,
+            num: 8, level: 4,
             references: "ISO 27002 8.22, 8.16, 5.7 NIST PR.AC-5",
             text: "La segmentation réseau est-elle dynamique et ajustée en fonction des menaces identifiées ?",
         },
@@ -960,42 +961,42 @@ const M1031 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.16; 8.20, 8.21; NIST DE.CM-1",
             text: "Des mécanismes de détection ou de prévention d'intrusion réseau sont-ils en place dans votre organisation ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 8.20, 8.21; NIST PR.IP-3",
             text: "Ces dispositifs permettent-ils de bloquer automatiquement certains flux identifiés comme malveillants ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.1; 8.20; NIST PR.IP-1",
             text: "Disposez-vous d'une politique formelle encadrant la détection et la prévention des intrusions réseau (zones surveillées, outils, règles) ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 5.7, 8.8; NIST PR.AC-7",
             text: "Les règles de détection utilisées sont-elles régulièrement mises à jour via des flux internes ou fournisseurs ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 8.20, 8.21; NIST PR.IP-11",
             text: "Ces mécanismes couvrent-ils l'ensemble des protocoles critiques (DNS, HTTP/S, FTP, SMB, SNMP, etc.) ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "NIST DE.CM-1; ISO 27002 8.16",
             text: "Des alertes automatiques sont-elles générées et transmises à l'équipe SOC ou SSI en cas de détection de comportement réseau suspect ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27002 5.24, 5.25; NIST PR.IP-3",
             text: "Existe-t-il un processus formalisé de traitement des alertes réseau avec triage, investigation et escalade ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 5.36; NIST PR.IP-1",
             text: "Des revues régulières sont-elles menées sur l'efficacité des règles de détection (faux positifs, couverture, alertes non traitées, etc.) ?",
         },
@@ -1015,37 +1016,37 @@ const M1032 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.2, 8.5, 5.17; NIST PR.AC-7, PR.AC-6",
             text: "Votre organisation applique-t-elle une authentification multi-facteurs (MFA) pour les comptes utilisateurs sensibles (administrateurs, comptes cloud, développeurs, etc.) ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.3, 8.5, NIST PR.AC-5",
             text: "MFA est-il activé sur tous les services exposés à Internet (VPN, RDP, SaaS, Webmail, etc.) ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.1, 5.16, 5.17; NIST PR.IP-1",
             text: "Une politique formelle d'authentification incluant le MFA est-elle définie et diffusée ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 8.5; NIST PR.AC-7",
             text: "Le MFA repose-t-il sur au moins deux facteurs distincts conformes (ex : OTP + mot de passe, carte à puce, biométrie...) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.2, 8.3, 8.4; NIST PR.IP-11",
             text: "Le MFA est-il contextuel ou adaptatif (en fonction du rôle, du lieu, de l'état du terminal, etc.) ?",
         },
         {
-            num: 6, level: 4, docRequired: true,
+            num: 6, level: 4,
             references: "ISO 27002 5.36; NIST PR.IP-8",
             text: "L'organisation effectue-t-elle des revues régulières des activations/désactivations MFA ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27002 8.15, 8.16; NIST DE.CM-7",
             text: "Des alertes sont-elles générées en cas d'échec MFA répété ou de contournement ?",
         },
@@ -1065,42 +1066,42 @@ const M1033 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.2 et 8.3",
             text: "Les utilisateurs standards (sans privilèges) ne sont pas en mesure d'installer des applications sur leur poste.",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 5.1 et 8.9",
             text: "La liste des applications autorisées est-elle formellement définie et maintenue ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.1 et 8.9",
             text: "Les règles concernant l'installation des applications sont-elles formalisées dans une politique ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 5.1 et 5.36",
             text: "La politique relative à l'installation des applications est-elle revue périodiquement ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 8.9 et 8.32",
             text: "Le processus de validation et d'autorisation des nouvelles applications est-il formalisé ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 5.36 et 8.9",
             text: "La liste des applications autorisées fait-elle l'objet de revues périodiques ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27002 8.9 et 8.16",
             text: "Les applications non autorisées installées sont-elles détectées automatiquement ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 8.15, 8.16 et 8.32",
             text: "Existe-t-il une traçabilité des installations d'applications (utilisateur, date, application concernée) ?",
         },
@@ -1120,27 +1121,27 @@ const M1034 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.4, NIST PR.AC-6",
             text: "Disposez-vous d'un mécanisme permettant de bloquer l'installation automatique de périphériques non approuvés ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 8.3, NIST PR.AC-3, NIST PR.AC-6",
             text: "Votre organisation a-t-elle mis en place une politique définissant les règles d'utilisation des périphériques matériels ?",
         },
         {
-            num: 3, level: 3, docRequired: false,
+            num: 3, level: 3,
             references: "ISO 27002 8.5, ISO 27002 8.7, NIST PR.DS-3, NIST PR.PT-2",
             text: "Utilisez-vous une solution technique (ex : MDM, gestion des postes, whitelisting de périphériques) pour contrôler ou restreindre l'utilisation des périphériques matériels ?",
         },
         {
-            num: 4, level: 4, docRequired: true,
+            num: 4, level: 4,
             references: "ISO 27002 8.7, NIST PR.PT-3",
             text: "Des audits ou contrôles réguliers sont-ils réalisés afin de vérifier l'efficacité des restrictions appliquées aux périphériques matériels ?",
         },
         {
-            num: 5, level: 4, docRequired: false,
+            num: 5, level: 4,
             references: "ISO 27002 8.16, NIST PR.DS-6",
             text: "Existe-t-il un mécanisme de détection des tentatives d'utilisation de périphériques non autorisés, avec génération d'alertes exploitables par les équipes de sécurité (ex : SOC) ?",
         },
@@ -1160,37 +1161,37 @@ const M1035 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 5.10; NIST PR.AC-5, PR.PT-4",
             text: "Votre organisation restreint-elle l'accès aux ressources réseau internes (accès distant, partages, protocoles) ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 5.10; NIST PR.AC-3",
             text: "Les accès distants (RDP, SSH, VPN, etc.) sont-ils obligatoirement centralisés via des concentrateurs (VPN, bastion, RDP Gateway) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.23; NIST PR.AC-5; PR.PT-3",
             text: "Les services distants inutilisés ( ex : Telnet, SMB, etc.) sont-ils désactivés ou filtrés ?",
         },
         {
-            num: 4, level: 3, docRequired: true,
+            num: 4, level: 3,
             references: "ISO 27002 5.15; NIST PR.AC-5, DE.CM-1",
             text: "L'accès aux API ou services d'administration distants (Docker, Kubernetes API, Metadat API…) est-il restreint à des IP/Segments de confiance ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 5.36; NIST PR.AC-5",
             text: "Les règles ou mécanismes de limitation d'accès sont-ils revus régulièrement ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "NIST DE.CM-1, DE.CM-7",
             text: "Des alertes sont-elles générées lorsqu'un accès non autorisé est tenté ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "NIST DE.DP-4; ISO 27002 5.36",
             text: "Des mesures correctives sont-elles systématiquement prises suite à une détection ou un incident d'accès illégitime ?",
         },
@@ -1210,57 +1211,57 @@ const M1036 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 5.16, 8.2, 8.3; NIST PR.AC-1, PR.AC-4, PR.AC-6, PR.IP-11",
             text: "Votre organisation a-t-elle mis en œuvre des mécanismes limitant ou encadrant l'utilisation des comptes (ex. : verrouillage après échec, restrictions d'accès, Conditional Access, restrictions géographiques ou horaires) ?",
         },
         {
-            num: 2, level: 1, docRequired: true,
+            num: 2, level: 1,
             references: "ISO 27002 8.2; NIST PR.AC-6, PR.AC-7",
             text: "Un verrouillage automatique est-il configuré après plusieurs tentatives de connexion échouées ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.3; NIST PR.AC-6",
             text: "Les accès aux comptes sont-ils restreints selon des plages horaires lorsque cela est pertinent ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.5; NIST PR.AC-7, PR.IP-11",
             text: "L'utilisation des comptes ou des identifiants est-elle restreinte à des contextes précis (équipements approuvés, localisation, niveau de risque, Conditional Access ou mécanisme équivalent) ?",
         },
         {
-            num: 5, level: 2, docRequired: true,
+            num: 5, level: 2,
             references: "ISO 27002 5.16, 5.17; NIST PR.AC-1, PR.AC-4",
             text: "Une politique formelle définit-elle les conditions d'utilisation des comptes (restrictions d'accès, contexte de connexion, plages horaires, etc.) ?",
         },
         {
-            num: 6, level: 2, docRequired: true,
+            num: 6, level: 2,
             references: "ISO 27002 5.36; NIST PR.IP-8, PR.IP-11",
             text: "Des audits ou contrôles réguliers sont-ils réalisés afin de vérifier le respect des politiques d'utilisation des comptes ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 : 8.5 NIST : PR.AC-7, PR.PT-3",
             text: "Les sessions expirent-elles automatiquement après une période d'inactivité ?",
         },
         {
-            num: 8, level: 3, docRequired: true,
+            num: 8, level: 3,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.AE-3, DE.CM-1",
             text: "Les tentatives de connexion réussies et échouées sont-elles journalisées ?",
         },
         {
-            num: 9, level: 3, docRequired: false,
+            num: 9, level: 3,
             references: "ISO 27002 : 8.16 NIST : DE.AE-2, DE.CM-1",
             text: "Des alertes sont-elles générées lorsqu'une utilisation anormale ou non autorisée d'un compte est détectée ?",
         },
         {
-            num: 10, level: 4, docRequired: false,
+            num: 10, level: 4,
             references: "ISO 27002 : 5.18, 8.2 NIST : PR.AC-1, PR.AC-4",
             text: "Les politiques d'utilisation des comptes sont-elles adaptées dynamiquement en fonction du contexte de connexion (niveau de risque, localisation, équipement utilisé, comportement de l'utilisateur, etc.) ?",
         },
         {
-            num: 11, level: 4, docRequired: false,
+            num: 11, level: 4,
             references: "ISO 27002 5.18 NIST : PR.AC-1, PR.AC-4",
             text: "Les comptes inactifs sont-ils automatiquement désactivés après une période définie ?",
         },
@@ -1280,37 +1281,37 @@ const M1037 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.22, 8.23, NIST PR.AC-5, PR.PT-4",
             text: "Votre organisation applique-t-elle un filtrage réseau sur les flux entrants et sortants ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.22; NIST DE.CM-1",
             text: "Disposez-vous de règles spécifiques pour filtrer certains protocoles ou ports (SMB, DNS, FTP, SSH, etc.) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.16, NIST PR.PT-4",
             text: "Le filtrage réseau est-il appliqué aussi bien au niveau des équipements réseau que des postes de travail ou serveurs lorsque cela est pertinent ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 5.14; NIST DE.CM-7",
             text: "Les communications vers des services externes (DNS, services Cloud, interconnexions, etc.) sont-elles contrôlées par des mécanismes de filtrage adaptés ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 5.14, ISO 27002 5.36; NIST PR.AC-5, DE.CM-1",
             text: "Les règles de filtrage réseau font-elles l'objet de revues périodiques ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 8.16; NIST DE.CM-1, DE.CM-7",
             text: "Les événements issus des équipements de filtrage réseau sont-ils analysés dans le cadre de la supervision de sécurité (SOC, SIEM ou équivalent) ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27002 5.36; NIST DE.DP-4",
             text: "Des actions d'amélioration continue sont-elles engagées suite à l'analyse de ces journaux ou d'incidents réseau ?",
         },
@@ -1330,42 +1331,42 @@ const M1038 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 5.15 / 8.2",
             text: "Les utilisateurs standards (sans privilèges) ne sont pas en mesure d'installer des applications sur leur poste.",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 5.13 / 5.20",
             text: "L'exécution automatique de code depuis des supports amovibles (ex : clés USB) est-elle désactivée ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.10",
             text: "Des mécanismes sont-ils mis en œuvre afin d'empêcher ou de restreindre l'exécution de scripts non autorisés (PowerShell, macros Office, VBScript, JavaScript, etc.) ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 5.17",
             text: "Une politique de contrôle de l'exécution des applications (AppLocker, Windows Defender Application Control, Software Restriction Policies ou mécanisme équivalent) est-elle déployée sur les postes ou serveurs concernés ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 8.12",
             text: "Une liste blanche d'applications autorisées ou un mécanisme équivalent est-il défini et appliqué afin de limiter l'exécution aux logiciels approuvés ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 5.13 / 5.18",
             text: "Une solution de protection des terminaux (antivirus ou NGAV) est-elle déployée afin de détecter et de bloquer les logiciels malveillants connus lors de leur exécution ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.16",
             text: "Une solution de sécurité des terminaux intégrant des capacités de détection comportementale est-elle déployée afin de détecter et de bloquer les comportements malveillants ou les techniques d'exécution avancées ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 8.16",
             text: "Les alertes générées par les mécanismes de contrôle de l'exécution et les solutions de protection des terminaux sont-elles journalisées, centralisées et analysées dans le cadre de la supervision de sécurité (SOC, SIEM ou équivalent) ?",
         },
@@ -1385,22 +1386,22 @@ const M1039 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 - 8.2 et 8.3 NIST : PR.AA-05, PR.PS-01",
             text: "Les fichiers contenant les variables d'environnement système sont-ils protégés contre l'écriture par des utilisateurs non autorisés ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 - 5.1, 5.16 et 8.2 NIST : GV.PO-01, GV.RR-02, PR.AA-05",
             text: "Une politique ou des règles formalisées limitent-elles la modification des variables d'environnement aux rôles ou groupes autorisés ?",
         },
         {
-            num: 3, level: 3, docRequired: true,
+            num: 3, level: 3,
             references: "ISO 27002 - 8.15, 8.16 et 5.36 NIST : PR.PS-04, DE.CM-03, GV.OV-03",
             text: "Les modifications des variables d'environnement critiques sont-elles journalisées et auditées régulièrement ?",
         },
         {
-            num: 4, level: 4, docRequired: false,
+            num: 4, level: 4,
             references: "ISO 27002 - 8.9, 8.16 et 8.32 NIST : PR.IR-01, PR.PS-01, DE.CM-09, DE.AE-02",
             text: "L'accès aux variables d'environnement est-il isolé par conteneur ou par processus avec détection automatique des changements non autorisés ?",
         },
@@ -1420,27 +1421,27 @@ const M1040 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.16, NIST PR.IP-9",
             text: "Votre organisation utilise-t-elle des outils de protection contre les comportements suspects sur les endpoints (EDR, HIPS, ASR) ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 8.15, NIST PR.AC-4",
             text: "Votre organisation a-t-elle mis en place une politique définissant les comportements suspects à bloquer sur les endpoints ?",
         },
         {
-            num: 3, level: 3, docRequired: false,
+            num: 3, level: 3,
             references: "ISO 27002 8.16, NIST PR.IP-9",
             text: "Vos outils de protection sont-ils configurés pour appliquer des règles spécifiques pour détecter et bloquer les comportements suspects ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 8.28, NIST DE.CM-7",
             text: "Les journaux des outils de prévention des endpoints sont-ils collectés, analysés et corrélés avec un SIEM ?",
         },
         {
-            num: 5, level: 4, docRequired: true,
+            num: 5, level: 4,
             references: "ISO 27002 8.30, NIST RS.AN-4",
             text: "Effectuez-vous des tests d'efficacité de vos règles de prévention des comportements malveillants ? (ex. Red Team, Pentest, simulation d'attaques)",
         },
@@ -1460,32 +1461,32 @@ const M1041 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 8.24, NIST PR.DS-1",
             text: "Votre organisation chiffre-t-elle certaines données sensibles, qu'elles soient stockées ou transmises ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 8.25, NIST PR.IP-4",
             text: "Votre organisation dispose-t-elle d'une politique de chiffrement définissant les types de données à chiffrer et les méthodes acceptées ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 : 8.24, 8.25 NIST : PR.DS-1, PR.DS-2",
             text: "Le chiffrement concerne les données au repos, en transit et au niveau des sauvegardes",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 5.12, NIST PR.PT-4",
             text: "Votre organisation utilise-t-elle une solution de gestion des clés et des certificats (KMS, HSM, PKI) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 : 8.25 PR.IP-4, PR-DS-2",
             text: "Une rotation des clés de chiffrement est-elle mise en place selon un calendrier défini ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 8.30, NIST PR.IP-4, DE.CM-8",
             text: "Des contrôles sont-ils mis en place pour s'assurer du respect des politiques de chiffrement ?",
         },
@@ -1505,32 +1506,32 @@ const M1042 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 8.19 & 8.2",
             text: "Les utilisateurs ne peuvent pas installer librement des logiciels/services (droits limités) et un contrôle centralisé (liste blanche/noire, catalogue d'applis approuvées) est mis en place ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 8.9 & 8.10",
             text: "Supprimez/désactivez-vous lors de l'installation/configuration les logiciels/services obsolètes ou inutiles identifiés ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.9",
             text: "Réalisez-vous une revue régulière (à minima une fois par an) de l'inventaire logiciel pour supprimer/désactiver ce qui est inutile/obsolète, avec une couverture complete des postes/serveurs ?",
         },
         {
-            num: 4, level: 3, docRequired: true,
+            num: 4, level: 3,
             references: "ISO 27002 8.9",
             text: "Cette revue inclut-elle systématiquement les add-ons/plug-ins/extensions (navigateurs, suites bureautiques, IDE, clients de messagerie) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.16 & 8.19 & 8.9",
             text: "Disposez-vous d'un mécanisme automatisé et d'une surveillance continue pour identifier, désactiver ou bloquer les logiciels/services non autorisés ou obsolètes, y compris la détection de réactivation ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 5.7",
             text: "La suppression/désactivation est-elle intégrée au cycle de gestion des actifs et est-elle alimentée par une veille de sécurité régulière ?",
         },
@@ -1550,37 +1551,37 @@ const M1043 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 : 8.2, 8.5 NIST : PR.AC-6, PR.AC-7",
             text: "Des mécanismes de protection des identifiants sont-ils déployés sur certains systèmes ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 : 5.15 NIST : PR.AC-6",
             text: "Le principe du moindre privilège est-il appliqué et respecté ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 : 8.2, 8.7 NIST : PR.AC-6, PR.PT-3",
             text: "Windows Defender Credential Guard est-il activé sur les terminaux d'entreprise ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 : 8.2, 8.3 NIST : PR.AC-6, PR.AC-7",
             text: "La stratégie de groupe prévoit-elle de réduire ou éliminer l'utilisation des informations d'identification mises en cache?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 : 8.9 NIST : PR.IP-1, PR.PT-3",
             text: "Des fonctionnalités de sécurité matérielles telles que DEP (Data Execution Prevention) et ASLR (Address Space Layout Randomization) sont-elles mises en place ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 : 8.2, 8.5 NIST : PR.AC-6, PR.PT-3",
             text: "L'accès au magasin d'informations d'identification tel que \"C:\\Windows\\System32\\config\\SAM (security account manager)\" est limité ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.AE-2, DE.CM-1",
             text: "La journalisation inclut-elle la surveillance des indentifants des utilisateurs (signaler les comportements suspects liés au vol d'identifiants)",
         },
@@ -1600,37 +1601,37 @@ const M1044 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27001: 5.22 & 8.7 & 8.4",
             text: "Empêchez-vous le chargement de DLL non signées ou non autorisés sur tous vos types de plateformes?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27001: 5.22 & 8.9 & 8.4",
             text: "Avez-vous mis en œuvre une politique de restriction logicielle (SRP, WDAC) sur les postes et serveurs ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27001: 8.2 & 8.4",
             text: "Les mécanismes de recherche et de chargement des bibliothèques (ex. SafeDllSearchMode pour Windows, LD_LIBRARY_PATH/LD_PRELOAD pour Linux) sont-ils configurés pour limiter les emplacements autorisés et empêcher les injections malveillantes ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27001: 8.2 & 8.4",
             text: "Les droits d'écriture dans les répertoires de recherche et d'écriture des Librairies sont-ils limités aux comptes autorisés ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27001: 8.16",
             text: "Existe t-il une surveillance pour alerter ou bloquer les comportements d'exécution malveillants venant des librairies ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27001: 8.15",
             text: "Existe-t-il une traçabilité complète des chargements de DLL (process, user, quand, DLL concernée) ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27001: 8.15",
             text: "Existe-t-il une processus de gestion des DLL et de leur droits avec une journalisations des exceptions des événements et des audits.",
         },
@@ -1650,37 +1651,37 @@ const M1045 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.11, 8.24; NIST PR.DS-6, PR.IP-3",
             text: "Votre organisation applique-t-elle une vérification automatique des signatures numériques des binaires, scripts ou composants logiciels ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.11; NIST PR.DS-6",
             text: "L'exécution des scripts ou binaires non signés est-elle bloquée automatiquement (ex : AppLocker, WDAC, Gatekeeper, PowerShell policy) ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.32, 8.9; NIST PR.IP-1, PR.DS-1",
             text: "Une politique de signature est-elle formalisée et s'applique-t-elle à toutes les phases du cycle de vie logiciel ?",
         },
         {
-            num: 4, level: 3, docRequired: true,
+            num: 4, level: 3,
             references: "ISO 27002 10.1, 8.11; NIST ID.SC-4",
             text: "Les images systèmes, conteneurs ou packages utilisés sont-ils vérifiés via des signatures numériques ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 5.36; NIST PR.IP-3",
             text: "L'organisation réalise-t-elle des revues régulières des fichiers autorisés ou des règles de signature en place ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 8.16; NIST DE.CM-1, PR.DS-6",
             text: "Votre organisation détecte-t-elle les tentatives d'exécution de code non signé ou modifié ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.24; NIST PR.IP-3",
             text: "L'organisation a-t-elle défini un processus formel de mise à jour des signatures de référence (trusted publishers, certificates, hash lists, etc.) ?",
         },
@@ -1700,32 +1701,32 @@ const M1046 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 : 8.9, 8.7 NIST : PR.PT-3, PR.IP-1",
             text: "Les systèmes de l'organisation utilisent-ils un mécanisme de démarrage sécurisé (ex : Secure Boot) empêchant le chargement de composants non signés lors du démarrage ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 : 8.2, 8.9 NIST : PR.AC-6, PR.PT-3",
             text: "Les utilisateurs ou administrateurs locaux sont-ils empêchés de désactiver ou modifier les paramètres de sécurité du firmware (ex : mot de passe BIOS/UEFI, verrouillage des paramètres Secure Boot) ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 : 8.9, 8.8 NIST : PR.IP-1, PR.IP-3",
             text: "Les mises à jour du firmware (BIOS/UEFI) et des composants du processus de démarrage sont-elles réalisées uniquement à partir de sources approuvées et signées par les éditeurs ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 : 8.9 NIST : PR.PT-2, PR.PT-3",
             text: "Les systèmes utilisent-ils un mécanisme matériel de racine de confiance (ex : TPM ou équivalent) pour vérifier l'intégrité du processus de démarrage ?",
         },
         {
-            num: 5, level: 4, docRequired: false,
+            num: 5, level: 4,
             references: "ISO 27002 : 8.16 NIST : DE.CM-1, DE.AE-2",
             text: "Les mécanismes d'intégrité du démarrage permettent-ils de détecter les modifications non autorisées du processus de démarrage (ex : Measured Boot, attestation d'intégrité) ?",
         },
         {
-            num: 6, level: 4, docRequired: true,
+            num: 6, level: 4,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.AE-2, DE.CM-1",
             text: "Les anomalies liées à l'intégrité du processus de démarrage (firmware modifié, Secure Boot désactivé, échec de vérification) génèrent-elles des alertes analysées par les équipes de sécurité (SOC / SIEM / EDR) ?",
         },
@@ -1745,42 +1746,42 @@ const M1047 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 5.16",
             text: "Des vérifications périodiques de sécurité sont-elles réalisées afin d'identifier des anomalies, des écarts de configuration ou des risques sur le système d'information ?",
         },
         {
-            num: 2, level: 2, docRequired: true,
+            num: 2, level: 2,
             references: "ISO 27002 5.36",
             text: "Ces vérifications sont-elles réalisées selon une fréquence définie et documentée ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.9",
             text: "Le périmètre des systèmes, applications, équipements, ressources cloud ou autres actifs faisant l'objet de ces vérifications est-il défini et tenu à jour ?",
         },
         {
-            num: 4, level: 2, docRequired: true,
+            num: 4, level: 2,
             references: "ISO 27002 5.36",
             text: "Les résultats des vérifications sont-ils documentés afin d'assurer la traçabilité des constats et des anomalies identifiés ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO 27002 8.9",
             text: "Les vérifications portent-elles régulièrement sur les principaux éléments du système d'information tels que les permissions, les configurations système et réseau, les logiciels, les journaux d'événements, les activités des utilisateurs et les ressources cloud lorsqu'elles existent ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27002 5.27",
             text: "Les écarts ou anomalies identifiés lors de ces vérifications sont-ils analysés, priorisés et suivis jusqu'à leur résolution ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 5.27",
             text: "Les actions correctives mises en œuvre à la suite des vérifications font-elles l'objet d'une vérification permettant de confirmer leur efficacité ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 5.36",
             text: "Des indicateurs permettent-ils de mesurer l'efficacité des vérifications et d'améliorer en continu la sécurité du système d'information ?",
         },
@@ -1800,27 +1801,27 @@ const M1048 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.20, 8.7",
             text: "Disposez-vous d'un sandboxing des e-mails en production analysant dynamiquement pièces jointes et URL avant livraison aux utilisateurs ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 8.20, 8.7",
             text: "Disposez-vous d'un sandboxing lors de la navigation Web analysant dynamiquement les ressources téléchargées avant livraison aux utilisateurs ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 8.22",
             text: "Vos applications critiques sont-elles exécutées en environnement isolé (VM/conteneur/sandbox) avec accès aux ressources limité ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 8.22, 8.1, 8.20, 8.7",
             text: "Le sandboxing/isolation est-il déployé systématiquement sur tous les endpointsressources les plus sensibles (messagerie, endpoints utilisateurs, applications sensibles) avec politiques centralisées et supervision ?",
         },
         {
-            num: 5, level: 4, docRequired: false,
+            num: 5, level: 4,
             references: "ISO 27002 8.23, 8.22, 8.1",
             text: "Est-ce que le sandboxing/isolation est supervisé/monitoré dans le but de détecter les comportements malveillants et lever des alertes ?",
         },
@@ -1840,32 +1841,32 @@ const M1049 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.7, NIST DE.CM-4",
             text: "Votre organisation utilise-t-elle des solutions antivirus et/ou antimalware pour détecter les menaces par signatures et heuristiques ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.7, ISO 27002 8.19, NIST PR.DS-1",
             text: "Ces solutions couvrent-elles l'ensemble des actifs (serveurs, endpoints, mobiles) et sont-elles centralisées pour une gestion et une visibilité globales ?",
         },
         {
-            num: 3, level: 3, docRequired: false,
+            num: 3, level: 3,
             references: "ISO 27002 8.7, NIST DE.CM-4, PR.IP-12",
             text: "Les solutions antivirus sont-elles mises à jour automatiquement et incluent-elles des capacités de détection avancée (heuristique, machine learning, sandboxing) ?",
         },
         {
-            num: 4, level: 3, docRequired: true,
+            num: 4, level: 3,
             references: "ISO 27002 8.9, NIST PR.PT-1",
             text: "Les logs des antivirus sont-ils collectés, centralisés et revus régulièrement pour détecter des attaques persistantes ou des échecs de détection ?",
         },
         {
-            num: 5, level: 4, docRequired: true,
+            num: 5, level: 4,
             references: "ISO 27002 8.8, NIST PR.IP-12",
             text: "Votre entreprise effectue-t-elle des tests d'intrusion ou des simulations de menaces pour valider l'efficacité des solutions antivirus et antimalware ?",
         },
         {
-            num: 6, level: 4, docRequired: false,
+            num: 6, level: 4,
             references: "ISO 27002 8.7, NIST PR.IP-12",
             text: "Votre entreprise dispose-t-elle d'un processus de mise à jour et d'amélioration des protections antivirus basé sur l'évolution des menaces ?",
         },
@@ -1885,37 +1886,37 @@ const M1050 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 : 8.9 NIST : PR.IP-1, PR.PT-3",
             text: "Les systèmes utilisent-ils des mécanismes de protection mémoire natifs du système d'exploitation (ex : DEP, ASLR, CFG) pour limiter l'exploitation des vulnérabilités ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 : 8.9, 5.23 NIST : PR.IP-1, PR.IP-3",
             text: "Ces protections sont-elles activées et appliquées de manière homogène sur les postes de travail et les serveurs via une configuration centralisée (ex : GPO, baseline de sécurité, MDM) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 : 8.9 NIST : PR.IP-1, PR.PT-3",
             text: "Des mécanismes de durcissement du système sont-ils utilisés pour limiter les exploitations (ex : SELinux, AppArmor ou mécanismes équivalents) ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 : 8.7 NIST : DE.CM-4, PR.PT-1",
             text: "Une solution de sécurité des endpoints (antivirus avancé ou EDR) est-elle déployée pour détecter ou bloquer les comportements typiques d'exploitation de vulnérabilités ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 : 8.7, 8.9 NIST : PR.PT-3, DE.CM-4",
             text: "Les mécanismes de protection contre les exploits sont-ils configurés pour bloquer certaines techniques d'attaque (ex : exploitation mémoire, injection de code, élévation de privilèges) ?",
         },
         {
-            num: 6, level: 4, docRequired: true,
+            num: 6, level: 4,
             references: "ISO 27002 : 8.15, 8.16 NIST : DE.CM-1, DE.AE-3",
             text: "Comment les protections gèrent-elles la compatibilité avec différents bins et architectures, et quels cas sont non couverts ?Les événements liés aux tentatives d'exploitation (détection exploit, comportement anormal) sont-ils journalisés par les outils de sécurité ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 : 5.25, 8.16 NIST : DE.AE-2, RS.AN-1",
             text: "Ces événements sont-ils analysés dans le cadre de la supervision de sécurité (SIEM, SOC ou équivalent) afin d'identifier et traiter les tentatives d'exploitation ?",
         },
@@ -1935,37 +1936,37 @@ const M1051 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 8.8",
             text: "Les systèmes d'exploitation (OS) des postes et serveurs reçoivent-ils des mises à jour régulières en production selon une cadence définie ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 8.8",
             text: "Les mises à jour couvrent-elles également les applications majeures et leurs composants ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 8.8",
             text: "Disposez-vous d'un processus de déploiement d'urgence pour les correctifs critiques/zero-day (délais cibles documentés, capacité de déployer hors cycle) ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.9",
             text: "La gestion des mises à jour est-elle centralisée via des outils/plateformes (par ex. gestionnaire de correctifs) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.9",
             text: "Le déploiement des correctifs est-il automatisé, imposé lorsque nécessaire et accompagné de retours d'état permettant d'identifier les échecs de déploiement ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27002 8.9",
             text: "Le processus couvre-t-il également les firmwares, BIOS/UEFI, pilotes et autres composants embarqués lorsque cela est applicable ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 8.8",
             text: "Des contrôles de conformité, des indicateurs de couverture des correctifs et une veille sur les vulnérabilités permettent-ils de vérifier l'efficacité du processus ?",
         },
@@ -1985,27 +1986,27 @@ const M1052 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.8",
             text: "Le contrôle UAC est-il activé sur l'ensemble des postes de travail et des systèmes concernés ?",
         },
         {
-            num: 2, level: 1, docRequired: true,
+            num: 2, level: 1,
             references: "ISO 27002 8.8",
             text: "Les utilisateurs disposent-ils uniquement de comptes standards pour leurs activités quotidiennes, les élévations de privilèges étant réalisées uniquement lorsque cela est nécessaire ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 8.8",
             text: "La configuration du contrôle UAC est-elle définie et appliquée selon une politique adaptée aux différents types de systèmes (postes de travail, serveurs, etc.) ?",
         },
         {
-            num: 4, level: 3, docRequired: true,
+            num: 4, level: 3,
             references: "ISO 27002 8.9",
             text: "Les événements liés aux demandes d'élévation de privilèges sont-ils journalisés et surveillés ?",
         },
         {
-            num: 5, level: 4, docRequired: true,
+            num: 5, level: 4,
             references: "ISO 27002 8.9",
             text: "Des audits réguliers permettent-ils de vérifier l'efficacité du contrôle UAC et l'adéquation de sa configuration avec la politique de gestion des privilèges ?",
         },
@@ -2025,42 +2026,42 @@ const M1053 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 8.13, NIST PR.IP-4",
             text: "Votre organisation réalise-t-elle des sauvegardes des données critiques ?",
         },
         {
-            num: 2, level: 2, docRequired: false,
+            num: 2, level: 2,
             references: "ISO 27002 8.13, NIST PR.IP-4",
             text: "Les sauvegardes sont-elles réalisées de manière automatisée et régulière ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 8.13, NIST PR.IP-4",
             text: "Votre organisation dispose-t-elle d'une politique formelle de gestion des sauvegardes ?",
         },
         {
-            num: 4, level: 3, docRequired: false,
+            num: 4, level: 3,
             references: "ISO 27002 8.14, NIST PR.PT-5",
             text: "Les sauvegardes sont-elles stockées sur un support distinct et isolé du réseau de production (ex. sauvegardes hors ligne, air-gapped, stockage cloud sécurisé) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 5.33, NIST PR.DS-1, PR.DS-2",
             text: "Utilisez-vous des mécanismes de protection des sauvegardes contre l'accès non autorisé (ex. chiffrement, MFA, contrôle d'accès strict) ?",
         },
         {
-            num: 6, level: 3, docRequired: true,
+            num: 6, level: 3,
             references: "ISO 27002 8.13, NIST PR.IP-10",
             text: "Votre organisation réalise-t-elle des tests réguliers de restauration des sauvegardes ?",
         },
         {
-            num: 7, level: 4, docRequired: true,
+            num: 7, level: 4,
             references: "ISO 27002 5.29, NIST PR.IP-9",
             text: "Disposez-vous d'un plan de reprise après sinistre (PRA) formel intégrant l'utilisation des sauvegardes en cas d'incident majeur ?",
         },
         {
-            num: 8, level: 4, docRequired: true,
+            num: 8, level: 4,
             references: "ISO 27002 5.36, NIST PR.IP-9",
             text: "Des audits ou revues de conformité sur la gestion des sauvegardes sont-ils réalisés régulièrement et intégrés dans un cycle d'amélioration continue incluant les retours d'incidents et de tests ?",
         },
@@ -2080,52 +2081,52 @@ const M1054 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO/IEC 27001: 5.19 & 8.19 & 8.26",
             text: "Les recommandations de sécurité publiées par les éditeurs sont-elles prises en compte lors de la configuration des logiciels ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO/IEC 27001: 8.9 et 8.15",
             text: "Les logiciels sont-ils configurés conformément aux règles de sécurité définies par votre organisation ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO/IEC 27001: 8.2, 8.3 et 8.5 / NIST CSF 2.0: PR.AA-05",
             text: "L'accès aux logiciels, à leurs fonctionnalités sensibles et aux données qu'ils traitent est-il protégé par une authentification adaptée et le principe du moindre privilège ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO/IEC 27001: 8.19/ NIST CSF 2.0: PR.PS-02",
             text: "Les fonctionnalités, modules ou services non nécessaires sont-ils désactivés sur les logiciels utilisés ?",
         },
         {
-            num: 5, level: 3, docRequired: true,
+            num: 5, level: 3,
             references: "ISO/IEC 27001: 5.22 & 8.9/ NIST CSF 2.0: PR.PS-01",
             text: "Disposez-vous d'un processus formel de gestion des configurations logicielles ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO/IEC 27001: 8.9/ NIST CSF 2.0: PR.PS-01",
             text: "Les configurations logicielles sont-elles documentées et versionnées ?",
         },
         {
-            num: 7, level: 3, docRequired: true,
+            num: 7, level: 3,
             references: "ISO/IEC 27001: 8.9 / NIST CSF 2.0: PR.PS-01",
             text: "Les configurations logicielles sont-elles revues périodiquement afin d'identifier les écarts par rapport aux exigences de sécurité ?",
         },
         {
-            num: 8, level: 3, docRequired: true,
+            num: 8, level: 3,
             references: "ISO/IEC 27001: 5.22/ NIST CSF 2.0: ID.RA-09",
             text: "Faites vous des audits pour vérifier les paramètres de sécurité des logiciels (mise à jour, fonctionalité non utilisée, ….) ?",
         },
         {
-            num: 9, level: 4, docRequired: false,
+            num: 9, level: 4,
             references: "ISO/IEC 27001: 5.22 & 8.31/ NIST CSF 2.0: PR.PS-01 & ID.RA-09",
             text: "Les changements de configuration ou de version sont-ils testés dans un environnement de préproduction avant leur déploiement ?",
         },
         {
-            num: 10, level: 4, docRequired: false,
+            num: 10, level: 4,
             references: "ISO/IEC 27001: 8.16/ NIST CSF 2.0: PR.PS-04",
             text: "Les journaux des logiciels sont-ils activés et surveillés afin de détecter les événements de sécurité ?",
         },
@@ -2153,52 +2154,52 @@ const M1056 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "MITRE ATT&CK",
             text: "Les actifs critiques sont-ils identifiés et priorisés afin d'appliquer en priorité les mesures de protection préventives ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "MITRE ATT&CK",
             text: "Les mesures de réduction de la surface d'attaque sont-elles adaptées à la criticité des systèmes (segmentation, durcissement, Tiering, etc.) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "MITRE ATT&CK",
             text: "Votre réseau est-il segmenté en zones de confiance (ex : DMZ, LAN, Tier 0/1/2) ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "MITRE ATT&CK",
             text: "Un modèle de Tiering (ou une classification équivalente des systèmes et comptes) est-il mis en œuvre afin d'isoler les ressources les plus critiques ?",
         },
         {
-            num: 5, level: 2, docRequired: false,
+            num: 5, level: 2,
             references: "MITRE ATT&CK",
             text: "Les accès aux systèmes les plus critiques sont-ils strictement limités et surveillés ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "MITRE ATT&CK",
             text: "Des règles de filtrage réseau spécifiques sont-elles appliquées selon la criticité des actifs ou des zones (pare-feu, ACL, micro-segmentation, etc.) ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "MITRE ATT&CK",
             text: "Les équipements de sécurité détectent-ils ou bloquent-ils les tentatives de reconnaissance (scans de ports, balayages réseau, découverte de services, etc.) ?",
         },
         {
-            num: 8, level: 3, docRequired: false,
+            num: 8, level: 3,
             references: "MITRE ATT&CK",
             text: "Les résultats des évaluations de vulnérabilités sont-ils utilisés pour adapter les mesures de protection des actifs les plus critiques ?",
         },
         {
-            num: 9, level: 4, docRequired: false,
+            num: 9, level: 4,
             references: "MITRE ATT&CK",
             text: "Une veille sur les vulnérabilités et les menaces permet-elle d'adapter les mesures de protection en fonction de la criticité des actifs ?",
         },
         {
-            num: 10, level: 4, docRequired: false,
+            num: 10, level: 4,
             references: "MITRE ATT&CK",
             text: "Les utilisateurs et administrateurs sont-ils sensibilisés aux techniques de compromission initiale (phishing, ingénierie sociale, reconnaissance) en fonction de leur niveau d'exposition ?",
         },
@@ -2218,57 +2219,57 @@ const M1057 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: true,
+            num: 1, level: 1,
             references: "ISO 27002 8.12, NIST PR.DS-5",
             text: "Disposez-vous d'une stratégie de Data Loss Prevention (DLP) ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 5.9, 5.12, 5.14, 8.10, 8.12; NIST ID.AM-5",
             text: "Cette politique DLP couvre-t-elle le cycle de vie des données sensibles (inventaire, classification, transfert, suppression) ?",
         },
         {
-            num: 3, level: 2, docRequired: true,
+            num: 3, level: 2,
             references: "ISO 27002 5.9, 5.12, 5.34; NIST ID.AM-5",
             text: "Disposez-vous d'un inventaire et d'une classification formelle des données sensibles (PII, données confidentielles, etc.) ?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 8.12, NIST PR.DS-5",
             text: "Votre système DLP est-il configuré pour détecter les formats indiquant la présence de PII ou d'autres catégories de données sensibles ?",
         },
         {
-            num: 5, level: 2, docRequired: false,
+            num: 5, level: 2,
             references: "ISO 27002 8.12, 5.14, 5.23, 8.10",
             text: "Le DLP couvre-t-il la détection de données sensibles sur les partages réseau, les postes de travail et/ou les supports amovibles ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 8.12; NIST PR.DS-5",
             text: "Le DLP est-il configuré pour contrôler/alerter/bloquer la copie de données vers des périphériques USB ou autres supports physiques ?",
         },
         {
-            num: 7, level: 3, docRequired: false,
+            num: 7, level: 3,
             references: "ISO 27002 8.12, 5.23; NIST PR.DS-5",
             text: "Le DLP surveille-t-il les transferts via les web services (ex. SharePoint, services Cloud, transferts HTTP/HTTPS, etc.) et les protocoles alternatifs (FTP, SFTP, etc.) ?",
         },
         {
-            num: 8, level: 3, docRequired: false,
+            num: 8, level: 3,
             references: "ISO 27002 5.14, 8.12; NIST PR.DS-5",
             text: "Le DLP est-il configuré pour analyser et bloquer ou chiffrer automatiquement les e-mails sortants contenant des données confidentielles ?",
         },
         {
-            num: 9, level: 3, docRequired: false,
+            num: 9, level: 3,
             references: "ISO 27002 8.11, 5.34, 5.12",
             text: "Disposez-vous de règles DLP spécifiques pour exiger un chiffrement ou un masquage des données sensibles (Data Masking) avant transfert / stockage ?",
         },
         {
-            num: 10, level: 4, docRequired: true,
+            num: 10, level: 4,
             references: "ISO 27002 5,36, NIST PR.IP-8",
             text: "Effectuez-vous des audits internes ou externes pour vérifier l'efficacité du DLP ?",
         },
         {
-            num: 11, level: 4, docRequired: false,
+            num: 11, level: 4,
             references: "ISO 27002 5.24; NIST DE.AE-2",
             text: "Disposez-vous d'un processus d'amélioration continue (leçons tirées d'incidents, mise à jour des règles DLP, sensibilisation périodique) ?",
         },
@@ -2288,42 +2289,42 @@ const M1060 = {
     ],
     questions: [
         {
-            num: 1, level: 1, docRequired: false,
+            num: 1, level: 1,
             references: "ISO 27002 5.29, 8.14 NIST CSF 2.0 RC.CO-03, RC.IM-02",
             text: "L'entreprise dispose-t-elle d'un canal de communication indépendant du réseau principal en cas de coupure ou d'incident majeur ?",
         },
         {
-            num: 2, level: 1, docRequired: false,
+            num: 2, level: 1,
             references: "ISO 27002 5.29, 6.03 NIST CSF 2.0 RC.CO-01, RC.CO-02",
             text: "Ce canal a-t-il déjà été identifié et communiqué aux collaborateurs concernés (cellule de crise, direction, équipes IT) ?",
         },
         {
-            num: 3, level: 2, docRequired: false,
+            num: 3, level: 2,
             references: "ISO 27002 5.30, 5.37 NIST CSF 2.0 RC.RP-01",
             text: "L'utilisation de ce canal est elle documentée (mention dans le plan de continuité d'activité)?",
         },
         {
-            num: 4, level: 2, docRequired: false,
+            num: 4, level: 2,
             references: "ISO 27002 5.29, 5.30 NIST CSF 2.0 RC.RP-02",
             text: "Ce canal fait-il l'objet de procédures d'activation précises (quand basculer sur ce canal, quelles équipes le déclenchent, comment communiquer l'accès) ?",
         },
         {
-            num: 5, level: 3, docRequired: false,
+            num: 5, level: 3,
             references: "ISO 27002 8.24, 5.29 NIST CSF 2.0 PR.DS-01 / PR.DS-05",
             text: "Les communications via ce canal sont-elles chiffrées et authentifiées ?",
         },
         {
-            num: 6, level: 3, docRequired: false,
+            num: 6, level: 3,
             references: "ISO 27002 5.29, 5.30 NIST CSF 2.0 RC.IM-03",
             text: "Le canal alternatif est-il régulièrement testé lors d'exercices de crise, de simulations de cyberattaque ou de coupure réseau ? Les résultats servent-ils pour l'amélioration continue ?",
         },
         {
-            num: 7, level: 4, docRequired: false,
+            num: 7, level: 4,
             references: "ISO 27002 5.35, 5.36, 8.15, 8.16 NIST CSF 2.0 RC.IM-04, RC.CO-05",
             text: "L'entreprise audit-elle ou supervise-t-elle la conformité et la sécurité de ces canaux (chiffrement, tracabilité, disponibilité) ?",
         },
         {
-            num: 8, level: 4, docRequired: false,
+            num: 8, level: 4,
             references: "ISO 27002 5.29, 5.30, 8.14 NIST CSF 2.0 RC.RP-02, RC.CO-03, PR.DS-04",
             text: "Disposez-vous de plusieurs canaux de communication alternatifs, indépendants du réseau principal, permettant de maintenir la continuité des échanges critiques en cas de défaillance d'un canal ou d'incident majeur ?",
         },

@@ -56,6 +56,11 @@ export function setAnswer(layer, mitigationId, num, { value, tool, note } = {}) 
         value: value ?? previous.value ?? null,
         tool: tool ?? previous.tool ?? "",
         note: note ?? previous.note ?? "",
+        // Où la question a été posée. Une question commune est rangée chez son
+        // porteur, mais elle a pu être posée depuis n'importe lequel de ses
+        // membres : c'est cette trace qui permet de ne pas la reposer aux
+        // autres, sans pour autant la faire disparaître de là où on y a répondu.
+        askedIn: mitigationId,
         at: new Date().toISOString(),          // horodatage par question, pour l'auditabilité
     };
     // Le curseur suit la mitigation où l'on répond, pas celle qui porte.
@@ -292,6 +297,9 @@ export function sanitiseAnswers(answers) {
                 value,
                 tool: entry?.tool || "",
                 note: entry?.note || "",
+                // Absent d'un fichier antérieur, ou d'un classeur : la question
+                // est alors réputée posée là où elle est rangée.
+                askedIn: entry?.askedIn || null,
                 at: entry?.at || null,
             };
         }

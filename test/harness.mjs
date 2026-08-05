@@ -437,7 +437,7 @@ ok("une feuille « Réponses » sans réponse valable est signalée",
 /* ------------------------------------------------------ JSON chiffré */
 
 console.log("\n[10] Aller-retour JSON chiffré");
-const { exportJSON, readLayerFile, isEncrypted } = await import(`${ROOT}/js/io.js`);
+const { exportJSON, exportName, readLayerFile, isEncrypted } = await import(`${ROOT}/js/io.js`);
 
 // On intercepte le téléchargement pour récupérer le contenu produit.
 let produced = null;
@@ -1105,6 +1105,85 @@ ok("M1027 Q2 reste séparée de M1018 Q2", groupOf("M1027", 2) === null);
        window.document.querySelector(".quiz-question")?.textContent.includes("ou sensibles"));
 }
 
+console.log("\n[24b] Une question commune n'est jamais reposée");
+{
+    const { answeredElsewhere } = await import(`${ROOT}/js/shared-questions.js`);
+    const { sanitiseAnswers } = await import(`${ROOT}/js/layer.js`);
+
+    const l = createLayer({ name: "doublons" });
+    setAnswer(l, "M1033", 1, { value: "Oui" });     // groupe M1033 Q1 / M1038 Q1
+    ok("là où on y a répondu, la question reste la sienne",
+       answeredElsewhere(l, "M1033", 1) === null);
+    ok("ailleurs dans le groupe, elle n'est plus à poser",
+       answeredElsewhere(l, "M1038", 1)?.value === "Oui");
+    ok("une question qui n'est commune à rien n'est jamais sautée",
+       answeredElsewhere(l, "M1033", 2) === null && answeredElsewhere(l, "M1013", 1) === null);
+
+    // Le porteur du groupe n'est pas forcément celui où la question a été posée :
+    // c'est bien l'endroit de la saisie qui compte, sans quoi répondre depuis le
+    // membre non porteur ferait reposer la question chez le porteur.
+    const inverse = createLayer({ name: "inverse" });
+    setAnswer(inverse, "M1038", 1, { value: "Oui" });
+    ok("répondre depuis le membre non porteur vaut pour tout le groupe",
+       answeredElsewhere(inverse, "M1038", 1) === null &&
+       answeredElsewhere(inverse, "M1033", 1)?.value === "Oui",
+       JSON.stringify(inverse.answers.M1033?.[1]));
+
+    // Un fichier antérieur, ou relu depuis un classeur, ne porte pas la trace de
+    // l'endroit où la question a été posée. Le porteur fait alors foi : la
+    // question est réputée posée là où elle est rangée.
+    const ancien = createLayer({ name: "ancien" });
+    ancien.answers = sanitiseAnswers({ M1033: { 1: { value: "Oui" } } });
+    ok("sans trace d'origine, la question est réputée posée chez son porteur",
+       answeredElsewhere(ancien, "M1033", 1) === null &&
+       answeredElsewhere(ancien, "M1038", 1)?.value === "Oui");
+}
+
+{
+    // Le parcours, à l'écran. Tout est traité sauf M1026, et la question commune
+    // au groupe MFA a été répondue « Non » depuis M1018 : M1026 doit s'arrêter
+    // sur sa question 7 sans jamais l'afficher, et dire pourquoi.
+    const l = createLayer({ name: "Doublon bloquant" });
+    for (const id of CATALOG.keys()) {
+        if (id !== "M1026") setAnswer(l, id, CATALOG.get(id).questions[0].num, { value: "Non" });
+    }
+    setAnswer(l, "M1018", 5, { value: "Non" });
+
+    window.document.getElementById("brand").click();
+    const zone = window.document.getElementById("home-drop");
+    const evt = new window.Event("drop");
+    evt.dataTransfer = { files: [new window.File([toJSON(l)], "doublon.json", { type: "application/json" })] };
+    zone.dispatchEvent(evt);
+    await new Promise(r => setTimeout(r, 80));
+
+    ok("le questionnaire reprend sur M1026",
+       window.document.querySelector(".quiz-tag")?.textContent.trim() === "M1026",
+       window.document.querySelector(".quiz-tag")?.textContent.trim());
+
+    const vues = [];
+    for (let i = 0; i < 6; i++) {
+        vues.push(window.document.querySelector(".quiz-progress-label")?.textContent.trim().split("·")[0].trim());
+        window.document.querySelector('[data-answer="Oui"]')?.click();
+    }
+    ok("les six premières questions sont posées normalement",
+       vues.join(" | ") === [1, 2, 3, 4, 5, 6].map(n => `Question ${n} / 14`).join(" | "),
+       vues.join(" | "));
+
+    const resultat = window.document.querySelector(".quiz-result");
+    ok("la septième, déjà tranchée ailleurs, n'est pas reposée : le parcours s'arrête",
+       !!resultat && !window.document.querySelector(".quiz-question"),
+       resultat ? "résultat affiché" : "question encore à l'écran");
+
+    const mot = window.document.querySelector(".quiz-result .quiz-shared")?.textContent ?? "";
+    ok("et l'arrêt est expliqué : question commune, réponse « Non »",
+       /commune/.test(mot) && /M1018/.test(mot) && /Non/.test(mot),
+       mot.replace(/\s+/g, " ").trim().slice(0, 130));
+    ok("le décompte annonce les questions non reposées",
+       /déjà répondue.? depuis une autre mitigation/.test(
+           window.document.querySelector(".quiz-result")?.textContent ?? ""),
+       window.document.querySelector(".quiz-result")?.textContent.replace(/\s+/g, " ").match(/\d+ questions? répondue[^·]*·[^·]*/)?.[0]);
+}
+
 /* ------------------------------------------- visuels de l'accueil et actions */
 
 console.log("\n[25] Rosace et matrice de fond sur l'accueil");
@@ -1115,26 +1194,33 @@ window.document.getElementById("brand").click();
     const data = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
     const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
 
-    // La toile : un rayon par mitigation, quatre polygones de repère.
-    ok("un rayon par mitigation évaluable",
-       home.querySelectorAll(".ros-spoke").length === QST.size,
-       `${home.querySelectorAll(".ros-spoke").length} rayons pour ${QST.size} mitigations`);
+    // La rosace porte les tactiques, pas les mitigations : c'est l'axe de
+    // lecture d'ATT&CK, et quinze rayons se lisent là où quarante-trois
+    // faisaient une dentelle. Les noms viennent du référentiel relu, donc une
+    // tactique ajoutée par MITRE apparaît sans qu'on touche à rien.
+    const tactiques = data.tactics.map(t => t.name);
+    ok("un rayon par tactique du référentiel",
+       home.querySelectorAll(".ros-spoke").length === tactiques.length,
+       `${home.querySelectorAll(".ros-spoke").length} rayons pour ${tactiques.length} tactiques`);
     ok("quatre polygones de repère, un par palier",
        home.querySelectorAll(".ros-web").length === 4);
 
     const dots = home.querySelectorAll(".ros-dot");
-    ok("un sommet par mitigation", dots.length === QST.size, String(dots.length));
+    ok("un sommet par tactique", dots.length === tactiques.length, String(dots.length));
     ok("chaque sommet porte un niveau de 0 à 4",
        [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
-    ok("chaque sommet nomme sa mitigation au survol",
-       [...dots].every(d => /^M1\d{3} — niveau [0-4]$/.test(d.querySelector("title")?.textContent ?? "")));
+    ok("chaque sommet nomme sa tactique au survol",
+       [...dots].map(d => (d.querySelector("title")?.textContent ?? "").replace(/ — niveau [0-4]$/, ""))
+           .join("|") === tactiques.join("|"),
+       dots[0]?.querySelector("title")?.textContent);
     ok("les sommets apparaissent l'un après l'autre",
        [...dots].map(d => d.style.getPropertyValue("--i")).join(",")
            === [...dots].map((_, i) => String(i)).join(","));
 
     // Le tracé doit relier exactement les sommets, dans le même ordre.
     const shapePoints = home.querySelector(".ros-shape")?.getAttribute("points").trim().split(/\s+/);
-    ok("le tracé relie tous les sommets", shapePoints?.length === QST.size, String(shapePoints?.length));
+    ok("le tracé relie tous les sommets", shapePoints?.length === tactiques.length,
+       String(shapePoints?.length));
     ok("et passe exactement par eux",
        shapePoints?.every((p, i) => p === `${dots[i].getAttribute("cx")},${dots[i].getAttribute("cy")}`));
 
@@ -1164,35 +1250,96 @@ window.document.getElementById("brand").click();
     // Sans libellé, la rosace ne se lit qu'au survol : un geste qui n'existe pas
     // au doigt, donc pas de lecture du tout sur un téléphone.
     const axes = home.querySelectorAll(".ros-axis");
-    ok("chaque rayon porte le nom de sa mitigation",
-       [...axes].map(a => a.textContent).join(",") === [...QST.keys()].join(","),
-       `${axes.length} libellés pour ${QST.size} rayons`);
-    ok("les libellés sont couchés dans l'axe de leur rayon",
-       [...axes].every(a => /^rotate\(-?[\d.]+ [\d.]+ [\d.]+\)$/.test(a.getAttribute("transform") ?? "")),
-       axes[0]?.getAttribute("transform"));
-    // Sur la moitié gauche, un libellé non retourné se lirait tête en bas.
-    const flipped = [...axes].filter(a => a.classList.contains("flip"));
-    ok("ceux de la moitié gauche sont retournés",
-       flipped.length > 0 && flipped.length < axes.length,
-       `${flipped.length} retournés sur ${axes.length}`);
-    ok("et ancrés par la fin, pour continuer de s'éloigner du centre",
-       /\.ros-axis\.flip\s*\{\s*text-anchor:\s*end/.test(homeCss));
+    const lignesDe = a => [...a.querySelectorAll("tspan")].map(t => t.textContent);
+    ok("chaque rayon porte le nom de sa tactique",
+       [...axes].map(a => lignesDe(a).join(" ")).join("|") === tactiques.join("|"),
+       `${axes.length} libellés pour ${tactiques.length} rayons`);
+    ok("les noms sont posés à l'horizontale, jamais couchés",
+       [...axes].every(a => !a.getAttribute("transform")),
+       axes[0]?.getAttribute("transform") ?? "aucune rotation");
+    // Un nom coupé au milieu d'un mot ne se lit plus : la coupure se fait aux
+    // espaces, et seulement là.
+    ok("les noms longs sont repliés aux espaces",
+       [...axes].every(a => lignesDe(a).every(l => !/^\S*-$/.test(l))) &&
+       [...axes].some(a => lignesDe(a).length > 1),
+       [...axes].map(a => lignesDe(a).join("/")).filter(t => t.includes("/")).slice(0, 3).join(" · "));
+    // Chaque libellé doit s'éloigner du dessin, pas le recouvrir : à droite il
+    // part du rayon, à gauche il s'y termine, en haut et en bas il se centre.
+    const ancres = [...axes].map(a => ["start", "end", "mid"].find(c => a.classList.contains(c)));
+    ok("chaque nom est ancré du côté où il s'éloigne du centre",
+       ancres.every(Boolean) && [...axes].every((a, i) => {
+           const dx = Number(a.getAttribute("x")) - 160;
+           const dy = Number(a.getAttribute("y")) - 160;
+           if (ancres[i] === "start") return dx > 0;
+           if (ancres[i] === "end") return dx < 0;
+           return Math.abs(dx) <= Math.hypot(dx, dy) * 0.3;   // proche de la verticale
+       }),
+       [...new Set(ancres)].join(","));
+    ok("et le CSS traduit les trois ancrages",
+       /\.ros-axis\.start\s*\{\s*text-anchor:\s*start/.test(homeCss) &&
+       /\.ros-axis\.end\s*\{\s*text-anchor:\s*end/.test(homeCss) &&
+       /\.ros-axis\.mid\s*\{\s*text-anchor:\s*middle/.test(homeCss));
 
     // Un libellé qui sort du viewBox est rogné, ou mord sur le texte voisin.
-    // C'est ce que `rMax` doit laisser comme marge : on le vérifie plutôt que de
-    // le supposer, la largeur d'un « M1015 » n'étant pas négociable.
-    const box = home.querySelector(".rosace").getAttribute("viewBox").split(/\s+/).map(Number);
-    const centre = box[2] / 2;
+    // C'est ce que la couronne du viewBox doit absorber : on le mesure plutôt
+    // que de le supposer, la largeur d'un « Resource Development » n'étant pas
+    // négociable — et le référentiel peut allonger ses noms sans prévenir.
     const font = Number(/\.ros-axis\s*\{[^}]*font-size:\s*([\d.]+)px/.exec(homeCss)[1]);
-    const chars = Math.max(...[...QST.keys()].map(id => id.length));
-    const spill = [...axes].filter(a => {
-        const r = Math.hypot(Number(a.getAttribute("x")) - centre, Number(a.getAttribute("y")) - centre);
-        return r + chars * font * 0.66 > centre;   // 0,66 em par caractère, majuscule comprise
-    });
+
+    /** Les libellés qui sortent du cadre, mesurés à 0,6 em par caractère. */
+    const debordent = (liste, svg) => {
+        const [minX, minY, boxW, boxH] = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+        return liste.filter(a => {
+            const ancre = ["start", "end", "mid"].find(c => a.classList.contains(c));
+            const x = Number(a.getAttribute("x"));
+            const y = Number(a.getAttribute("y"));
+            const lignes = lignesDe(a);
+            const largeur = Math.max(...lignes.map(l => l.length)) * font * 0.6;
+            const gauche = ancre === "start" ? x : ancre === "end" ? x - largeur : x - largeur / 2;
+            const hauteur = lignes.length * font * 0.8;
+            return gauche < minX || gauche + largeur > minX + boxW
+                || y - hauteur < minY || y + hauteur > minY + boxH;
+        });
+    };
+
+    const spill = debordent([...axes], home.querySelector(".rosace"));
     ok("les libellés tiennent dans le cadre de la rosace", spill.length === 0,
-       `${spill.length} débordent, marge disponible ${(centre - Math.hypot(
-           Number(axes[0].getAttribute("x")) - centre,
-           Number(axes[0].getAttribute("y")) - centre)).toFixed(1)}px`);
+       `${spill.length} débordent — ${spill.map(a => lignesDe(a).join(" ")).join(", ")}`);
+
+    // Le référentiel du banc n'a que deux tactiques : de quoi vérifier la
+    // mécanique, pas de quoi savoir si « Resource Development » tient dans la
+    // couronne. On rejoue donc le rendu sur les quinze noms réels — le cas que
+    // l'utilisateur a sous les yeux, et le seul où la place manque vraiment.
+    {
+        const { rosace } = await import(`${ROOT}/js/views/home-visuals.js`);
+        const reelles = ["Reconnaissance", "Resource Development", "Initial Access",
+            "Execution", "Persistence", "Privilege Escalation", "Stealth",
+            "Defense Impairment", "Credential Access", "Discovery", "Lateral Movement",
+            "Collection", "Command and Control", "Exfiltration", "Impact"];
+        const bac = window.document.createElement("div");
+        bac.innerHTML = rosace({ tactics: reelles.map(name => ({ name })) });
+
+        const vrais = [...bac.querySelectorAll(".ros-axis")];
+        ok("les quinze tactiques d'Enterprise tiennent dans le cadre",
+           vrais.length === reelles.length &&
+           debordent(vrais, bac.querySelector(".rosace")).length === 0,
+           debordent(vrais, bac.querySelector(".rosace")).map(a => lignesDe(a).join(" ")).join(", ")
+               || `${vrais.length} libellés placés`);
+        // Deux libellés voisins qui se chevauchent sont illisibles à deux. Sur la
+        // moitié droite comme sur la gauche, l'écart vertical entre rayons
+        // voisins doit dépasser la hauteur d'un libellé de deux lignes.
+        const ys = vrais.map(a => Number(a.getAttribute("y")));
+        const cotes = [1, -1].map(signe => vrais
+            .map((a, i) => ({ dx: Number(a.getAttribute("x")) - 160, y: ys[i] }))
+            .filter(p => Math.sign(p.dx) === signe)
+            .map(p => p.y).sort((a, b) => a - b));
+        const serres = cotes.flatMap(col => col.slice(1)
+            .map((y, i) => y - col[i]).filter(ecart => ecart < font * 2.2));
+        ok("deux noms voisins ne se chevauchent pas", serres.length === 0,
+           serres.length ? `écarts trop courts : ${serres.map(e => e.toFixed(1)).join(", ")}px`
+               : `écart minimal ${Math.min(...cotes.flatMap(col => col.slice(1)
+                   .map((y, i) => y - col[i]))).toFixed(1)}px pour ${(font * 2.2).toFixed(1)}px requis`);
+    }
 
     // La matrice de fond reprend la vraie structure du référentiel : une colonne
     // par tactique, autant de cases que de techniques. C'est cette silhouette
@@ -1781,6 +1928,11 @@ console.log("\n[32] Mise en forme du classeur");
     // ligne de synthèse. L'identifiant reste, la relecture en dépend.
     ok("les lignes ne répètent plus le nom de la mitigation",
        !titres.includes("Nom") && titres.includes("Mitigation"), titres.join(" | "));
+    // Plus rien ne réclame de justificatif : l'outil est la seule pièce demandée,
+    // et il reste facultatif.
+    ok("aucune colonne ne réclame de preuve documentaire",
+       !titres.includes("Vérification documentaire") &&
+       titres.includes("Outil (si applicable)"), titres.join(" | "));
 
     /* --- la ligne qui clôt chaque bloc --- */
     {
@@ -1824,9 +1976,27 @@ console.log("\n[32] Mise en forme du classeur");
         // en rouge tout ce qui n'était pas encore évalué.
         const regles = (relu2.getWorksheet("Mitigations").conditionalFormattings ?? [])
             .flatMap(p => p.rules);
+        const expressions = regles.filter(r => r.type === "expression");
         ok("les règles de couleur écartent explicitement les cellules vides",
-           regles.length >= 5 && regles.every(r => /<>""/.test(r.formulae?.[0] ?? "")),
-           regles[0]?.formulae?.[0]);
+           expressions.length >= 5 && expressions.every(r => /<>""/.test(r.formulae?.[0] ?? "")),
+           expressions[0]?.formulae?.[0]);
+
+        // La bibliothèque n'écrit aucun graphique — le format les décrit dans des
+        // pièces séparées qu'elle ne produit pas. Une barre de données, elle, est
+        // une mise en forme conditionnelle : elle vit dans la cellule, suit le
+        // tri et le filtre, et le nombre reste lisible à côté d'elle.
+        const barre = regles.find(r => r.type === "dataBar");
+        ok("le levier de chaque mitigation se lit en barres de données",
+           !!barre && barre.color?.argb === "FF2A78D6",
+           JSON.stringify({ type: barre?.type, color: barre?.color?.argb }));
+        ok("la barre s'ajoute au nombre, elle ne le remplace pas",
+           barre?.showValue !== false, String(barre?.showValue));
+        const colBarre = (relu2.getWorksheet("Mitigations").conditionalFormattings ?? [])
+            .find(p => p.rules.some(r => r.type === "dataBar"))?.ref;
+        ok("et elle porte sur le nombre de techniques couvertes",
+           colBarre === `${relu2.getWorksheet("Mitigations").getColumn(6).letter}2:`
+               + `${relu2.getWorksheet("Mitigations").getColumn(6).letter}${relu2.getWorksheet("Mitigations").rowCount}`,
+           colBarre);
     }
 
     /* --- la colonne des réponses : liste fermée et couleur --- */
@@ -1897,7 +2067,8 @@ console.log("\n[32] Mise en forme du classeur");
     // colonne ne casse pas l'import **en silence** — l'import cherche « Réponse »
     // et « Outil (si applicable) » par leur intitulé, rien ne l'avertirait de leur
     // disparition sinon.
-    const complet = createLayer({ name: "Pleine échelle" });
+    const complet = createLayer({ name: "Pleine échelle", respondent: { org: "Direction des SI" } });
+    complet.scoring = "cumulative";
     let n = 0;
     for (const [id, questionnaire] of QST) {
         n++;
@@ -1945,8 +2116,19 @@ console.log("\n[32] Mise en forme du classeur");
     ok("un classeur déposé dans l'interface est repris",
        progress(importe).answered === progress(complet).answered,
        `${progress(importe).answered} réponses reprises sur ${progress(complet).answered}`);
-    ok("et le layer prend le nom du fichier",
-       importe.name === "reprise-du-classeur", importe.name);
+    // Le fichier ne porte plus le nom du layer — il s'appelle « matrice-mitre »,
+    // suffixé de l'organisation. C'est donc la feuille Métadonnées qui rend son
+    // identité à l'évaluation ; sans cette lecture, un aller-retour par le
+    // classeur la rebaptiserait du nom du fichier et perdrait l'organisation,
+    // celle-là même qui nomme le fichier au réexport.
+    ok("et le layer retrouve son nom dans les métadonnées, pas dans celui du fichier",
+       importe.name === "Pleine échelle", importe.name);
+    ok("l'organisation revient avec, et renomme le fichier à l'identique",
+       importe.respondent.org === "Direction des SI" &&
+       exportName(importe) === "matrice-mitre-direction-des-si",
+       `${importe.respondent.org} → ${exportName(importe)}`);
+    ok("la méthode de notation survit au passage par le classeur",
+       importe.scoring === "cumulative", importe.scoring);
     ok("les outils saisis reviennent avec",
        Object.values(importe.answers).some(qs => Object.values(qs).some(e => e.tool === "Entra ID")));
 
@@ -1957,6 +2139,118 @@ console.log("\n[32] Mise en forme du classeur");
     const excelSrc = readFileSync(`${ROOT}/js/excel.js`, "utf8");
     ok("elle est chargée au premier besoin, et une seule fois",
        /chargement \?\?=/.test(excelSrc) && /cdnjs[^"]*exceljs/.test(excelSrc));
+}
+
+console.log("\n[33] La jauge de chargement selon ce que le serveur annonce");
+{
+    const { loadAttack } = await import(`${ROOT}/js/attack.js`);
+    const reseau = globalThis.fetch;
+
+    // Rejoue un chargement complet en décidant de ce que le serveur annonce.
+    // Derrière un proxy d'entreprise, `content-length` disparaît : le transfert
+    // se déroule normalement mais aucune taille ne permet de viser. La jauge
+    // restait alors figée à 0 % du début à la fin — un téléchargement qui avance
+    // derrière une barre morte se lit comme un blocage, et c'est ce qui a été
+    // rapporté depuis un poste d'entreprise.
+    const rejouer = async annonce => {
+        const rapports = [];
+        globalThis.fetch = async (url, opts) => {
+            const resp = await reseau(url, opts);
+            if (String(url).includes("index.json")) return resp;
+            return { ...resp, headers: { get: n => (n === "content-length" ? annonce : null) } };
+        };
+        try { await loadAttack((msg, ratio) => rapports.push({ msg, ratio })); }
+        finally { globalThis.fetch = reseau; }
+        return rapports;
+    };
+
+    const avec = await rejouer("4096");
+    ok("taille annoncée : la jauge est pilotée pendant le transfert",
+       avec.some(r => r.ratio !== undefined && r.ratio > 0 && r.ratio < 1),
+       avec.filter(r => r.ratio !== undefined).map(r => r.ratio.toFixed(2)).join(", "));
+
+    const sans = await rejouer(null);
+    // Le rapport final annonce bien 100 % : ce qui compte est ce qui se passe
+    // *pendant*, quand la barre doit rester en va-et-vient.
+    const pendant = sans.filter(r => /Mo lus|téléchargement…/.test(r.msg));
+    ok("taille inconnue : aucun ratio n'est annoncé pendant le transfert",
+       pendant.every(r => r.ratio === undefined),
+       pendant.map(r => `${r.msg.slice(0, 34)}=${r.ratio}`).join(" | "));
+    ok("le compteur d'octets continue pourtant d'avancer",
+       pendant.some(r => /Mo lus/.test(r.msg)),
+       pendant.map(r => r.msg).at(-1));
+    ok("aucun rapport ne fige la jauge à zéro avant de savoir la remplir",
+       !sans.some(r => r.ratio === 0) && !avec.some((r, i) => r.ratio === 0 && i === 0),
+       sans.map(r => r.ratio).join(","));
+
+    // La jauge doit repasser en va-et-vient quand le ratio se tait, sinon elle
+    // garde l'état pris au premier rapport et reste immobile.
+    const mainSrc = readFileSync(`${ROOT}/js/main.js`, "utf8");
+    ok("et l'affichage repasse en indéterminé quand le ratio se tait",
+       /ratio === undefined[\s\S]{0,220}classList\.remove\("determinate"\)/.test(mainSrc));
+}
+
+console.log("\n[34] Le fichier exporté porte l'organisation");
+{
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-name").value = "Évaluation nommée n'importe comment";
+    window.document.getElementById("nl-ok").click();
+    window.document.getElementById("q-matrix").click();
+    window.document.getElementById("dd-export-btn").click();
+
+    const champ = window.document.getElementById("ex-org");
+    ok("l'organisation se saisit au moment d'exporter", !!champ);
+    ok("elle est facultative : sans elle, le fichier porte le nom de l'outil",
+       window.document.getElementById("ex-name").textContent.startsWith("matrice-mitre."),
+       window.document.getElementById("ex-name").textContent);
+
+    champ.value = "Groupe Étoile & Cie";
+    champ.oninput();
+    ok("le nom du fichier s'annonce avant de cliquer",
+       window.document.getElementById("ex-name").textContent === "matrice-mitre-groupe-etoile-cie.xlsx / .json",
+       window.document.getElementById("ex-name").textContent);
+
+    // Le nom du layer, lui, est libre : il n'a jamais fait un bon nom de fichier.
+    ok("le nom du layer ne nomme plus le fichier",
+       !/n-importe-comment/.test(window.document.getElementById("ex-name").textContent));
+
+    // L'organisation n'est pas une donnée de l'export : elle appartient au layer,
+    // et se retrouve donc dans les métadonnées du classeur comme du JSON.
+    const parJSON = JSON.parse(toJSON(fromJSON(toJSON({
+        ...createLayer({ name: "x", respondent: { org: "Groupe Étoile & Cie" } }), catalog: CATALOG,
+    }))));
+    ok("elle voyage avec le layer, pas seulement avec le nom du fichier",
+       parJSON.respondent.org === "Groupe Étoile & Cie", parJSON.respondent.org);
+}
+
+console.log("\n[35] Ce qui a été retiré du questionnaire");
+{
+    const quizCss = readFileSync(`${ROOT}/css/quiz.css`, "utf8");
+    // Au doigt, le dernier bouton touché reste en `:hover` jusqu'au toucher
+    // suivant. La question suivante réutilisant le bouton du même endroit, elle
+    // s'affichait avec une réponse en apparence déjà choisie.
+    const survol = /@media \(hover: hover\)\s*\{([\s\S]*?)\n\}/.exec(quizCss)?.[1] ?? "";
+    ok("le survol d'une réponse est réservé au pointeur",
+       ["yes", "no", "na"].every(c => new RegExp(`\\.quiz-answer\\.${c}:hover`).test(survol)),
+       survol.replace(/\s+/g, " ").trim().slice(0, 90));
+    ok("aucune règle de survol ne subsiste hors de ce garde-fou",
+       !quizCss.replace(/@media \(hover: hover\)\s*\{[\s\S]*?\n\}/, "").includes(".quiz-answer:hover"));
+    ok("seule la classe posée par le code colore une réponse choisie",
+       ["yes", "no", "na"].every(c => new RegExp(`\\.quiz-answer\\.${c}\\.selected\\s*\\{`).test(quizCss)));
+
+    // La preuve documentaire n'est plus demandée : seul l'outil reste, facultatif.
+    const catalogSrc = readFileSync(`${ROOT}/js/catalog.js`, "utf8");
+    ok("le catalogue ne porte plus d'exigence de preuve documentaire",
+       !/docRequired/.test(catalogSrc) &&
+       ![...CATALOG.values()].some(q => q.questions.some(x => "docRequired" in x)));
+    ok("le générateur du catalogue ne la reprend plus",
+       !/docRequired/.test(readFileSync(`${ROOT}/tools/build-catalog.mjs`, "utf8")));
+    ok("le questionnaire n'affiche plus de mention de preuve attendue",
+       !/doc-flag|preuve documentaire attendue/.test(readFileSync(`${ROOT}/js/views/quiz.js`, "utf8")) &&
+       !/doc-flag/.test(quizCss));
+    ok("la case outil reste, et reste facultative",
+       /Outil en place, si applicable/.test(readFileSync(`${ROOT}/js/views/quiz.js`, "utf8")));
 }
 
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);
