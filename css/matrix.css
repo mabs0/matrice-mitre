@@ -335,20 +335,33 @@
     padding: 0 0 8px;
 }
 
+/* La largeur des colonnes est celle que fixe `gridTemplateColumns`, et rien
+   d'autre.
+
+   `min-width: max-content` la faisait dépendre du plus long libellé non replié :
+   le plancher de 96 px n'était jamais atteint, et les colonnes restaient larges
+   comme « Replication Through Removable Media ». Le texte se replie maintenant
+   dans la colonne, et c'est l'enveloppe qui défile si l'ensemble dépasse. */
 #matrix-grid {
     display: grid;
     gap: 3px;
     padding: 3px;
     align-items: start;
-    min-width: max-content;
+    min-width: min-content;
 }
+.cell, .tactic-head { overflow-wrap: break-word; }
 
 /* Plein écran : la grille tient dans la largeur, sans défilement horizontal.
    `min-width: max-content` l'en empêchait — c'est lui qui impose la largeur du
    plus long libellé. On le lève, et les textes passent à la ligne. */
 #matrix-grid.fit { min-width: 0; }
+/* Les mots se coupent aux espaces, et seulement là.
+   `overflow-wrap: anywhere` avec `hyphens: auto` découpait à l'intérieur des
+   mots : « Resource Development » sortait en « Re- / source Dev… », illisible.
+   `break-word` ne casse un mot que s'il ne tient pas seul sur une ligne — le
+   cas d'un « Deobfuscate/Decode » dans une colonne étroite, et de rien d'autre. */
 #matrix-grid.fit .cell,
-#matrix-grid.fit .tactic-head { overflow-wrap: anywhere; hyphens: auto; }
+#matrix-grid.fit .tactic-head { overflow-wrap: break-word; hyphens: manual; }
 /* La note est posée en absolu dans l'angle : on lui réserve sa place à droite,
    sinon l'identifiant passe dessous dans une colonne étroite. */
 #matrix-grid.fit .cell { padding: 3px 16px 3px 4px; }

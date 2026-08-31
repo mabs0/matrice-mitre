@@ -8,7 +8,7 @@
     width: 100%;
     max-width: 1040px;
     margin: 0 auto;
-    padding: 24px 24px 64px;
+    padding: 18px 24px 64px;
 }
 
 /* ------------------------------------------- matrice d'exemple en arrière-plan
@@ -97,13 +97,13 @@
    Les deux cartes doivent tenir dedans avec le titre et la rosace : c'est la
    rosace qui rend la place quand l'écran est bas, jamais les cartes. */
 .home-first {
-    min-height: calc(100dvh - 48px - 24px);
+    min-height: calc(100dvh - 48px - 18px);
     display: flex;
     flex-direction: column;
     /* Cale vers le haut plutôt qu'au centre : la hauteur ainsi récupérée revient
        à la rosace, qui est ce qu'on vient regarder. */
     justify-content: flex-start;
-    gap: clamp(10px, 1.6vh, 18px);
+    gap: clamp(8px, 1.2vh, 14px);
 }
 
 .home-hero {
@@ -111,7 +111,7 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: clamp(4px, 0.8vh, 10px);
+    gap: clamp(2px, 0.5vh, 8px);
 }
 
 /* Fréquentation, à la place du bandeau de version — lequel redisait le badge de
@@ -164,12 +164,13 @@
    au-delà d'un certain rapport largeur/hauteur rend la main à la largeur. */
 /* Le facteur en `vh` est ce qui décide que les deux cartes tiennent sous la
    ligne de flottaison. Mesuré : titre sur deux lignes (~88 px), accroche sur
-   trois (~71 px), cartes (~224 px) et les interlignes. Le reste va à la rosace,
-   soit 44 % de la hauteur — au-delà, les cartes passent sous le pli. */
+   trois (~71 px), cartes (~224 px). Le reste va à la rosace — 46 % de la
+   hauteur, ce que les interlignes resserrés ci-dessus rendent possible sans
+   repousser les cartes sous le pli. */
 .rosace {
     display: block;
     margin: 0 auto;
-    height: clamp(200px, 44vh, 520px);
+    height: clamp(200px, 46vh, 540px);
     width: auto;
     max-width: 100%;
     overflow: visible;
@@ -181,12 +182,12 @@
 /* La toile a son propre ton, `--toile` : les couleurs de bordure sont bien trop
    discrètes ici. Les polygones de repère portent plus d'information que les
    rayons, ils sont donc un peu plus marqués. */
-.ros-spoke { stroke: var(--toile); stroke-width: 0.7; opacity: 0.75; }
-.ros-web { fill: none; stroke: var(--toile); stroke-width: 0.9; }
+.ros-spoke { stroke: var(--toile); stroke-width: 0.9; opacity: 0.9; }
+.ros-web { fill: none; stroke: var(--toile); stroke-width: 1.2; }
 .ros-web-group { animation: ros-fade 0.5s ease-out both; }
 
 .ros-tick {
-    fill: var(--text-mute);
+    fill: var(--text-dim);
     font-size: 8px;
     font-variant-numeric: tabular-nums;
     dominant-baseline: middle;
@@ -197,9 +198,10 @@
    320 px laissent de quoi les écrire à l'horizontale, chacun ancré du côté où
    il s'éloigne du dessin — le markup pose la classe, l'angle du rayon décide. */
 .ros-axis {
-    fill: var(--text-mute);
+    fill: var(--text-dim);
     font-family: var(--font);
     font-size: 7.4px;
+    font-weight: 500;
     dominant-baseline: middle;
 }
 .ros-axis.start { text-anchor: start; }

@@ -955,6 +955,22 @@ const css = readFileSync(`${ROOT}/css/matrix.css`, "utf8");
 const colonne = Number(/minmax\((\d+)px/.exec(
     readFileSync(`${ROOT}/js/views/matrix.js`, "utf8"))[1]);
 ok("les colonnes sont resserrées", colonne <= 120, `${colonne}px`);
+
+// `min-width: max-content` rendait ce plancher inopérant : la grille prenait la
+// largeur du plus long libellé non replié, quelle que soit la valeur demandée.
+ok("et le plancher n'est pas court-circuité par le contenu",
+   !/#matrix-grid\s*\{[^}]*min-width:\s*max-content/.test(css),
+   (/#matrix-grid\s*\{[^}]*min-width:\s*([^;]+)/.exec(css) ?? [])[1]);
+
+// « Resource Development » sortait en « Re- / source Dev… » : `overflow-wrap:
+// anywhere` avec `hyphens: auto` coupe à l'intérieur des mots. On interroge les
+// déclarations seules — les commentaires citent les valeurs qu'on écarte.
+{
+    const regles = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    ok("les mots ne sont jamais coupés en leur milieu",
+       !/hyphens:\s*auto/.test(regles) && !/overflow-wrap:\s*anywhere/.test(regles),
+       (/hyphens:\s*auto|overflow-wrap:\s*anywhere/.exec(regles) ?? [])[0]);
+}
 const tailleCase = Number(/\.cell\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(css)[1]);
 ok("et les cases avec elles", tailleCase <= 0.61, `${tailleCase}rem`);
 // Le surlignage revient, mais commandé depuis la liste des mitigations et non
@@ -1663,6 +1679,19 @@ console.log("\n[28] Rampe de maturité");
     // palier le plus clair, le vert redescend — et l'exiger reviendrait à
     // reprendre la rampe qu'on vient d'écarter, où le niveau 0 était un rose
     // pâle qui ne se lisait pas comme un danger.
+    // La toile de la rosace doit se voir. Prise au ton des bordures, elle
+    // disparaissait sur les deux thèmes — 2,86:1 sur fond clair — et le tracé
+    // flottait sans repère de niveau.
+    for (const [nom, bloc, surface] of [
+        ["sombre", /^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)[1], "#12141a"],
+        ["clair", blocks[0], "#f9f9f7"],
+    ]) {
+        const toile = /--toile:\s*(#[0-9a-f]{6})/.exec(bloc)?.[1];
+        ok(`toile ${nom} : nettement détachée de sa surface`,
+           toile && contrast(toile, surface) >= 7,
+           `${toile} → ${toile ? contrast(toile, surface).toFixed(2) : "?"}:1`);
+    }
+
     ok("rampe claire : le niveau 0 est un vrai rouge, pas un rose",
        lightness(bySystem[0]) < 0.65, `clarté ${lightness(bySystem[0]).toFixed(3)}`);
     ok("rampe claire : mais le rouge est adouci, pas criard",
