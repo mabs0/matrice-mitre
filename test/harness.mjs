@@ -2253,5 +2253,65 @@ console.log("\n[35] Ce qui a été retiré du questionnaire");
        /Outil en place, si applicable/.test(readFileSync(`${ROOT}/js/views/quiz.js`, "utf8")));
 }
 
+console.log("\n[36] Un téléchargement qui échoue est retenté");
+{
+    const { loadAttack } = await import(`${ROOT}/js/attack.js`);
+    const reseau = globalThis.fetch;
+
+    const BUNDLE = "https://exemple.invalid/enterprise-attack-19.2.json";
+    const INDEX = JSON.stringify({
+        collections: [{
+            name: "Enterprise ATT&CK",
+            versions: [{ version: "19.2", url: BUNDLE, modified: "2026-08-20T00:00:00.000Z" }],
+        }],
+    });
+
+    // Rejoue un chargement en décidant du sort des premiers essais sur le
+    // bundle. Aucun octet ne part sur le réseau : seule la stratégie de reprise
+    // est en cause ici.
+    const rejouer = async echecs => {
+        const essais = [];
+        globalThis.fetch = async (url, opts) => {
+            if (String(url).includes("index.json")) return new Response(INDEX, { status: 200 });
+            essais.push(opts?.cache);
+            return essais.length <= echecs
+                ? new Response("400: Bad Request", { status: 400 })
+                : new Response(JSON.stringify({ objects: [] }), { status: 200 });
+        };
+        const rapports = [];
+        try {
+            const data = await loadAttack(msg => rapports.push(msg));
+            return { essais, rapports, data };
+        } catch (err) {
+            return { essais, rapports, err };
+        } finally { globalThis.fetch = reseau; }
+    };
+
+    // Le cas rapporté : GitHub répond 400 sur le plus gros fichier du dépôt
+    // quand un nœud de diffusion doit le chercher à froid. Un seul échec
+    // condamnait tout le chargement.
+    const passager = await rejouer(1);
+    ok("un 400 au premier essai ne condamne plus le chargement",
+       !passager.err && passager.data?.version === "19.2", passager.err?.message);
+    ok("l'utilisateur voit qu'un nouvel essai a lieu",
+       passager.rapports.some(m => /nouvel essai/.test(m)));
+
+    // L'autre cause : `force-cache` rejoue une entrée fautive du navigateur sans
+    // jamais la revalider — la page échoue en navigation normale et fonctionne
+    // en navigation privée, sur la même machine et le même réseau. Les essais
+    // suivants doivent donc court-circuiter le cache.
+    ok("le premier essai accepte le cache, les suivants l'écartent",
+       passager.essais[0] === "force-cache" && passager.essais.slice(1).every(c => c === "reload"),
+       passager.essais.join(" → "));
+
+    // Réessayer sans fin masquerait une panne réelle derrière une jauge qui
+    // tourne : l'erreur doit finir par remonter, telle quelle.
+    const durable = await rejouer(Infinity);
+    ok("une panne durable finit par être annoncée", /HTTP 400/.test(durable.err?.message ?? ""),
+       durable.err?.message);
+    ok("et elle n'est pas retentée indéfiniment", durable.essais.length === 3,
+       `${durable.essais.length} essais`);
+}
+
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);
 process.exit(failures ? 1 : 0);

@@ -75,13 +75,48 @@ export async function loadAttack(onProgress = () => {}) {
     return normalise(JSON.parse(text), release);
 }
 
+const ATTEMPTS = 3;
+
 /**
- * Télécharge en rendant compte de l'avancement réel.
- * `force-cache` sert la version déjà connue sans même revalider : c'est sans
- * risque puisque l'URL porte le numéro de version.
+ * Télécharge le bundle, en réessayant avant d'abandonner.
+ *
+ * Un seul échec suffisait à condamner le chargement, alors que les deux causes
+ * observées cèdent toutes les deux à un nouvel essai :
+ *
+ *  — GitHub répond parfois 400 sur ce fichier, le plus gros du dépôt (51 Mio),
+ *    quand un nœud de diffusion doit le chercher à froid ; la requête suivante
+ *    passe. C'est ce qui se produit dans les heures qui suivent la publication
+ *    d'une version.
+ *  — `force-cache` sert une réponse déjà en cache *sans jamais la revalider*.
+ *    Une entrée fautive retenue par le navigateur est donc rejouée à chaque
+ *    rechargement : la page échoue en navigation normale et fonctionne en
+ *    navigation privée, sur la même machine et le même réseau.
+ *
+ * D'où la stratégie : premier essai sur le cache — l'URL porte le numéro de
+ * version, elle est immuable, et une relecture y est gratuite —, puis essais
+ * suivants en `reload`, qui court-circuitent le cache et écartent du même coup
+ * l'entrée fautive.
  */
 async function fetchWithProgress(url, version, onProgress) {
-    const resp = await fetch(url, { cache: "force-cache" });
+    let last;
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        try {
+            return await download(url, version, onProgress, attempt === 1 ? "force-cache" : "reload");
+        } catch (err) {
+            last = err;
+            if (attempt === ATTEMPTS) break;
+            // Sans ratio : la jauge repart en va-et-vient plutôt que de rester
+            // figée sur l'avancement de la tentative abandonnée.
+            onProgress(`ATT&CK Enterprise v${version} — échec du téléchargement, nouvel essai…`);
+            await new Promise(r => setTimeout(r, 700 * attempt));
+        }
+    }
+    throw last;
+}
+
+/** Un essai de téléchargement, en rendant compte de l'avancement réel. */
+async function download(url, version, onProgress, cache) {
+    const resp = await fetch(url, { cache });
     if (!resp.ok) throw new Error(`bundle v${version} : HTTP ${resp.status}`);
 
     if (!resp.body?.getReader) return resp.text();      // pas de flux : lecture directe
