@@ -951,8 +951,14 @@ const colonne = Number(/minmax\((\d+)px/.exec(
 ok("les colonnes sont resserrées", colonne <= 120, `${colonne}px`);
 const tailleCase = Number(/\.cell\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(css)[1]);
 ok("et les cases avec elles", tailleCase <= 0.61, `${tailleCase}rem`);
-ok("les règles du surlignage sont retirées du CSS",
-   !/\.cell\.dimmed/.test(css) && !/\.cell\.highlighted/.test(css));
+// Le surlignage revient, mais commandé depuis la liste des mitigations et non
+// par un sélecteur dans la barre : c'est là qu'on se demande « celle-là, elle
+// protège quoi ? ». Voir [35c].
+ok("les règles du surlignage restent, pour la liste des mitigations",
+   /\.cell\.dimmed/.test(css) && /\.cell\.highlighted/.test(css));
+ok("« .cell.dimmed » est déclarée après « .cell.sub »",
+   css.indexOf(".cell.dimmed") > css.indexOf(".cell.sub"),
+   `sub à ${css.indexOf(".cell.sub")}, dimmed à ${css.indexOf(".cell.dimmed")}`);
 ok("« .cell.sub » ne fixe pas d'opacité",
    !/\.cell\.sub\s*\{[^}]*opacity/.test(css));
 
@@ -1765,10 +1771,13 @@ console.log("\n[30] Tenue sur écran étroit");
 
     const base = sheets.find(([n]) => n === "base")[1];
     const narrow = /@media\s*\(max-width:\s*560px\)\s*\{([\s\S]*)\n\}/.exec(base)?.[1] ?? "";
-    ok("la barre haute est allégée : sous-titre retiré, version réduite à son numéro",
-       /\.brand small\s*\{\s*display:\s*none/.test(narrow) &&
+    ok("la barre haute est allégée : version réduite à son numéro",
        /\.version-badge \.vb-long\s*\{\s*display:\s*none/.test(narrow),
        narrow.replace(/\s+/g, " ").slice(0, 120));
+    // La marque ne porte plus de sous-titre : « MAPTRIX maturité cyber »
+    // répétait dans la barre ce que la page dit déjà en grand juste dessous.
+    ok("la marque se réduit à son nom",
+       /MAPTRIX\s*<\/button>/.test(readFileSync(`${ROOT}/index.html`, "utf8")));
     ok("la marque ne passe jamais à la ligne dans une barre de 48 px",
        /\.brand\s*\{[^}]*white-space:\s*nowrap/.test(base));
 
@@ -2424,6 +2433,7 @@ console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
 
     // Personne ne connaît les quarante-trois sujets. Plutôt que de laisser
     // répondre à peu près, on prépare le message pour qui saura.
+    const ouverte = window.document.querySelector(".quiz-tag")?.textContent.trim();
     window.document.getElementById("q-ask").click();
     const corps = window.document.getElementById("ask-body")?.value ?? "";
     const question = window.document.querySelector(".quiz-question")?.textContent.trim() ?? "";
@@ -2431,11 +2441,58 @@ console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
        corps.slice(0, 60));
     ok("il situe la mitigation et explique les trois réponses",
        /M1013/.test(corps) && /Oui/.test(corps) && /Non/.test(corps) && /N\/A/.test(corps));
+
+    // Le destinataire ne connaît pas forcément ATT&CK, ni la démarche : sans un
+    // mot d'explication, le message arrive comme un questionnaire de plus, venu
+    // d'on ne sait où et pour on ne sait quoi.
+    ok("il explique ce qu'est le référentiel", /MITRE ATT&CK/.test(corps) &&
+       /techniques réellement/.test(corps), corps.split("\n").slice(2, 4).join(" "));
+    ok("et désamorce l'idée d'une bonne réponse attendue",
+       /pas de bonne réponse attendue/.test(corps));
+
+    // Un objet doit se comprendre seul dans une boîte de réception :
+    // « Maturité cyber — M1013 question 1 » ne disait ni de quoi il s'agit, ni
+    // ce qu'on attend.
+    const objet = window.document.getElementById("ask-subject")?.value ?? "";
+    ok("l'objet nomme le sujet plutôt qu'un identifiant",
+       objet.includes("Application Developer Guidance") && !/question \d/.test(objet), objet);
+    ok("et il reste modifiable, le lien suivant la saisie",
+       window.document.getElementById("ask-mail")?.getAttribute("href")
+           .includes(encodeURIComponent(objet).slice(0, 40)));
+
     // Rien ne part d'ici : le site ne parle à aucun service.
     ok("rien n'est envoyé, on copie ou on ouvre sa messagerie",
        !!window.document.getElementById("ask-copy") &&
        window.document.getElementById("ask-mail")?.getAttribute("href").startsWith("mailto:"));
-    window.document.querySelector("#modal .modal-close").click();
+
+    // Faire suivre, c'est reconnaître qu'on ne peut pas répondre maintenant : la
+    // mitigation est laissée telle quelle — aucune réponse inventée — et le
+    // parcours passe à la suivante au lieu d'y buter.
+    window.document.getElementById("ask-mail").click();
+    ok("la modale se ferme", !window.document.getElementById("ask-body"));
+    const apres = window.document.querySelector(".quiz-tag")?.textContent.trim();
+    ok("et le questionnaire passe à la mitigation suivante", apres && apres !== ouverte,
+       `${ouverte} → ${apres}`);
+    ok("sans inventer de réponse à celle qu'on a laissée",
+       !window.document.querySelector(".quiz-answer.selected"));
+
+    // La mitigation écartée ne doit pas revenir au premier détour : `nextTarget`
+    // rendrait indéfiniment la première mitigation incomplète, donc celle qu'on
+    // vient justement de mettre de côté.
+    window.document.getElementById("q-matrix").click();
+    window.document.getElementById("matrix-quiz").click();
+    ok("revenir au questionnaire ne ramène pas sur celle mise en attente",
+       window.document.querySelector(".quiz-tag")?.textContent.trim() !== ouverte,
+       window.document.querySelector(".quiz-tag")?.textContent.trim());
+
+    // Et elle n'est pas perdue pour autant : rien n'y étant répondu, elle
+    // redevient la prochaine à traiter dès qu'on repart d'un layer neuf.
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+    ok("un layer neuf repart du début, sans mémoire des mises en attente",
+       window.document.querySelector(".quiz-tag")?.textContent.trim() === ouverte,
+       window.document.querySelector(".quiz-tag")?.textContent.trim());
 }
 
 console.log("\n[35c] Le tableau de bord");
@@ -2517,15 +2574,43 @@ console.log("\n[35c] Le tableau de bord");
        window.document.querySelector('[data-mitigation="M1032"] .mit-score')?.textContent);
     ok("les autres restent visibles, sans note",
        !!window.document.querySelector("#dash-mitigations .mit-score.vide"));
-    // M1055 décrit les cas où l'on choisit de ne pas atténuer : pas de maturité
-    // à mesurer, donc pas de questionnaire à ouvrir.
-    ok("celle qui n'a pas de questionnaire ne s'ouvre pas",
-       !window.document.querySelector('[data-mitigation="M1055"]'));
+    /* --- cliquer une mitigation la surligne dans la matrice --- */
 
-    // Un clic mène au questionnaire de la mitigation : c'est la liste qui sert à
-    // choisir quoi reprendre.
+    // C'est la question qu'on se pose devant cette liste : « celle-là, elle
+    // protège quoi ? ». Elle se répond sur la carte, pas dans une énumération
+    // d'identifiants.
+    window.document.querySelector('[data-mitigation="M1032"]').click();
+    const couverte = window.document.querySelector('[data-tech="T1078"]');
+    const hors = window.document.querySelector('[data-tech="T9999"]');
+    ok("les techniques couvertes ressortent", couverte.classList.contains("highlighted"),
+       [...couverte.classList].join(" "));
+    ok("et le reste s'efface", hors.classList.contains("dimmed"),
+       [...hors.classList].join(" "));
+    ok("la ligne se marque comme sélectionnée",
+       window.document.querySelector('[data-mitigation="M1032"]').classList.contains("selected"));
+
+    // Le geste qui sélectionne est celui qui désélectionne.
+    window.document.querySelector('[data-mitigation="M1032"]').click();
+    ok("re-cliquer éteint le surlignage",
+       !window.document.querySelector(".cell.highlighted, .cell.dimmed"));
+
+    // La ligne sélectionnée offre d'ouvrir son questionnaire — proposé sur les
+    // quarante-quatre lignes, ce bouton ferait de la liste un mur d'actions.
+    ok("aucune action de questionnaire tant que rien n'est sélectionné",
+       !window.document.querySelector("[data-quiz]"));
     window.document.querySelector('[data-mitigation="M1018"]').click();
-    ok("un clic ouvre le questionnaire de la mitigation",
+    ok("elle apparaît sur la ligne sélectionnée",
+       !!window.document.querySelector('[data-quiz="M1018"]'));
+    // M1055 décrit les cas où l'on choisit de ne pas atténuer : pas de maturité
+    // à mesurer, donc rien à ouvrir — mais la ligne se surligne quand même.
+    window.document.querySelector('[data-mitigation="M1055"]').click();
+    ok("celle qui n'a pas de questionnaire se surligne sans proposer d'y répondre",
+       !!window.document.querySelector('[data-mitigation="M1055"].selected') &&
+       !window.document.querySelector("[data-quiz]"));
+
+    window.document.querySelector('[data-mitigation="M1018"]').click();
+    window.document.querySelector('[data-quiz="M1018"]').click();
+    ok("et l'action ouvre bien le questionnaire de la mitigation",
        window.document.querySelector(".quiz-tag")?.textContent.trim() === "M1018",
        window.document.querySelector(".quiz-tag")?.textContent.trim());
 

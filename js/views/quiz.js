@@ -30,12 +30,26 @@ const GLYPH_ASK = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class
  */
 const cursor = { mitigation: null, index: 0, showResult: false, stoppedBy: null };
 
+/**
+ * Mitigations mises en attente d'une réponse extérieure.
+ *
+ * Faire suivre une question, c'est reconnaître qu'on ne peut pas y répondre
+ * maintenant : la mitigation est laissée telle quelle — aucune réponse n'est
+ * inventée — et le parcours passe à la suivante plutôt que de buter dessus.
+ *
+ * Le suspens ne dure que la session : rien n'étant répondu, un layer exporté
+ * puis rouvert reprendra naturellement à cette question, ce qui est le
+ * comportement juste — la question est toujours sans réponse.
+ */
+const enAttente = new Set();
+
 /** Repart de zéro : appelé quand on charge ou crée un autre layer. */
 export function resetQuiz() {
     cursor.mitigation = null;
     cursor.index = 0;
     cursor.showResult = false;
     cursor.stoppedBy = null;
+    enAttente.clear();
 }
 
 export function renderQuiz(app, { mitigation } = {}) {
@@ -56,7 +70,7 @@ export function renderQuiz(app, { mitigation } = {}) {
     // Première passe : la prochaine mitigation à traiter, jamais ouverte en
     // priorité. Une fois tout traité, on repart du début du catalogue pour une
     // passe de relecture, en ne s'arrêtant que sur les « Non ».
-    const target = nextTarget(app.layer) || reviewTarget(app.layer);
+    const target = prochaineCible(app.layer) || reviewTarget(app.layer);
 
     if (target) {
         goTo(target.mitigation, indexOfQuestion(target.mitigation, target.question));
@@ -260,7 +274,7 @@ function paint(app) {
     if (back) back.onclick = () => { if (stepBack(app)) paint(app); };
     const next = $("#q-next");                 // rendu seulement si la question a une réponse
     if (next) next.onclick = () => advance(app);
-    $("#q-ask").onclick = () => askSomeone(questionnaire, question, texte);
+    $("#q-ask").onclick = () => askSomeone(app, questionnaire, question, texte);
     $("#q-matrix").onclick = () => app.show("matrix");
 }
 
@@ -274,14 +288,23 @@ function paint(app) {
    Rien n'est envoyé d'ici — le site ne parle à aucun service. On copie, ou on
    ouvre son propre client de messagerie. */
 
+/* Le destinataire ne connaît pas forcément ATT&CK, ni même la démarche. Deux
+   lignes suffisent à le situer : sans elles, le message arrive comme un
+   questionnaire de plus, venu d'on ne sait où et pour on ne sait quoi. */
 function askTemplate(questionnaire, question, texte) {
     return [
         `Bonjour,`,
         ``,
-        `Nous évaluons la maturité cyber de l'organisation sur le référentiel MITRE ATT&CK.`,
-        `Une question relève de ton périmètre, sur « ${questionnaire.id} — ${questionnaire.name} ».`,
+        `Nous dressons l'état des lieux de la sécurité de l'organisation. Nous nous appuyons`,
+        `sur MITRE ATT&CK, un référentiel public qui recense les techniques réellement`,
+        `employées lors d'attaques, et les mesures qui permettent de s'en protéger. Pour`,
+        `chacune de ces mesures, quelques questions situent où nous en sommes.`,
         ``,
-        `Question : ${texte}`,
+        `Une de ces questions relève de ton périmètre. Elle porte sur la mesure`,
+        `« ${questionnaire.name} » (${questionnaire.id}), qui vise à : ${premierePhrase(questionnaire.description)}`,
+        ``,
+        `La question :`,
+        `  ${texte}`,
         ``,
         `Réponses possibles :`,
         `  • Oui — la pratique est en place ;`,
@@ -289,27 +312,41 @@ function askTemplate(questionnaire, question, texte) {
         `  • N/A — elle ne s'applique pas à notre contexte.`,
         ``,
         `Un mot de contexte ou le nom de l'outil concerné nous serait utile.`,
+        `Il n'y a pas de bonne réponse attendue : l'objectif est de savoir où nous en sommes.`,
         ``,
         `Merci d'avance,`,
     ].join("\n");
 }
 
-function askSomeone(questionnaire, question, texte) {
+/** La description d'une mitigation fait un paragraphe : sa première phrase suffit. */
+function premierePhrase(texte) {
+    const phrase = String(texte ?? "").split(/(?<=\.)\s+/)[0] ?? "";
+    return phrase.charAt(0).toLowerCase() + phrase.slice(1);
+}
+
+function askSomeone(app, questionnaire, question, texte) {
     const corps = askTemplate(questionnaire, question, texte);
-    const sujet = `Maturité cyber — ${questionnaire.id} question ${question.num}`;
+    // L'objet doit se comprendre seul, dans une boîte de réception : « Maturité
+    // cyber — M1013 question 1 » ne dit ni de quoi il s'agit, ni ce qu'on
+    // attend, ni combien de temps ça prend.
+    const sujet = `Une question sur « ${questionnaire.name} » — état des lieux sécurité`;
 
     const panel = openModal(`
         <div class="modal-head">
             <h3 style="margin:0;font-size:1.02rem;">Faire suivre cette question</h3>
             <p style="margin:6px 0 0;font-size:0.76rem;color:var(--text-dim);line-height:1.5;">
-                À envoyer à la personne dont c'est le sujet. Rien ne part d'ici : le message est
-                à copier, ou à ouvrir dans votre messagerie.
+                Rien ne part d'ici : le message est à copier, ou à ouvrir dans votre messagerie.
+                La mitigation restera en attente et le questionnaire passera à la suivante.
             </p>
         </div>
         <div class="modal-body">
             <div class="field">
+                <label for="ask-subject">Objet</label>
+                <input type="text" id="ask-subject" value="${esc(sujet)}" autocomplete="off">
+            </div>
+            <div class="field">
                 <label for="ask-body">Message</label>
-                <textarea id="ask-body" rows="14" spellcheck="false">${esc(corps)}</textarea>
+                <textarea id="ask-body" rows="16" spellcheck="false">${esc(corps)}</textarea>
             </div>
             <div class="form-actions">
                 <button class="btn" id="ask-copy">Copier</button>
@@ -319,20 +356,69 @@ function askSomeone(questionnaire, question, texte) {
             </div>
         </div>`);
 
+    // L'objet reste modifiable : le lien `mailto:` se refait à la volée plutôt
+    // que de partir avec la valeur d'origine.
+    const lien = panel.querySelector("#ask-mail");
+    const majLien = () => {
+        lien.href = `mailto:?subject=${encodeURIComponent(panel.querySelector("#ask-subject").value)}`
+            + `&body=${encodeURIComponent(panel.querySelector("#ask-body").value)}`;
+    };
+    panel.querySelector("#ask-subject").oninput = majLien;
+    panel.querySelector("#ask-body").oninput = majLien;
+
     panel.querySelector("#ask-copy").onclick = async () => {
-        const texteAEnvoyer = panel.querySelector("#ask-body").value;
+        const message = `${panel.querySelector("#ask-subject").value}\n\n`
+            + panel.querySelector("#ask-body").value;
         try {
-            await navigator.clipboard.writeText(texteAEnvoyer);
-            toast("Message copié.");
+            await navigator.clipboard.writeText(message);
+            metEnAttente(app, questionnaire);
         } catch {
             // Le presse-papiers est refusé hors contexte sécurisé, et sur
-            // certains postes d'entreprise. La sélection laisse alors la main.
+            // certains postes d'entreprise. La sélection laisse alors la main —
+            // et on ne passe pas à la suite, puisque rien n'est parti.
             panel.querySelector("#ask-body").select();
             toast("Copie refusée par le navigateur — le texte est sélectionné.", "error");
         }
     };
-    panel.querySelector("#ask-mail").onclick = () => closeModal();
+    lien.onclick = () => metEnAttente(app, questionnaire);
     panel.querySelector(".modal-close").onclick = () => closeModal();
+}
+
+/**
+ * Met la mitigation en attente et passe à la suivante.
+ *
+ * Aucune réponse n'est inventée : la mitigation reste exactement où elle en
+ * était. Elle est seulement écartée du parcours le temps de la session, pour ne
+ * pas y buter à chaque fois qu'on revient à la question suivante à traiter.
+ */
+function metEnAttente(app, questionnaire) {
+    closeModal();
+    enAttente.add(questionnaire.id);
+
+    const target = prochaineCible(app.layer);
+    if (!target) {
+        toast(`${questionnaire.id} en attente — plus rien d'autre à traiter pour le moment.`);
+        app.show("matrix");
+        return;
+    }
+    goTo(target.mitigation, indexOfQuestion(target.mitigation, target.question));
+    paint(app);
+    toast(`${questionnaire.id} laissée en attente · au suivant : ${target.mitigation}`);
+}
+
+/** La prochaine mitigation à traiter, en sautant celles mises en attente. */
+function prochaineCible(layer) {
+    const cible = nextTarget(layer);
+    if (!cible || !enAttente.has(cible.mitigation)) return cible;
+
+    // `nextTarget` rendrait indéfiniment la première mitigation incomplète, y
+    // compris celle qu'on vient d'écarter : on parcourt le catalogue nous-mêmes.
+    for (const [id, questionnaire] of QUESTIONNAIRES) {
+        if (enAttente.has(id)) continue;
+        const state = questionnaireState(questionnaire, resolvedEntries(layer, id));
+        if (!state.complete) return { mitigation: id, question: state.nextNum };
+    }
+    return null;
 }
 
 /**
@@ -463,7 +549,7 @@ function paintResult(app, questionnaire, level) {
     // En première passe, la prochaine mitigation à traiter. Une fois tout
     // traité, le prochain point de blocage à relire, en repartant après
     // celle-ci pour ne pas la reproposer.
-    const target = nextTarget(app.layer) || reviewTarget(app.layer, questionnaire.id);
+    const target = prochaineCible(app.layer) || reviewTarget(app.layer, questionnaire.id);
 
     // Les outils cités pendant le questionnaire, rendus visibles ici : c'est le
     // premier endroit où le répondant les retrouve après les avoir saisis.

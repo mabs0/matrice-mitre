@@ -183,9 +183,11 @@ export function rosace(data, reels = null) {
                 <g class="ros-dots">${vertices}</g>
                 <g class="ros-axes">${axes}</g>
                 ${ticks}
-                <circle class="ros-hub" cx="${c}" cy="${c}" r="${r0 - 6}"/>
-                <text class="ros-value" x="${c}" y="${c - 1}">${average}</text>
-                <text class="ros-unit" x="${c}" y="${c + 12}">/ 4</text>
+                <!-- Le moyeu suit la note qu'il porte : à 30 px, « 1,9 » débordait
+                     du disque de rayon r0 − 6. -->
+                <circle class="ros-hub" cx="${c}" cy="${c}" r="${r0 - 1}"/>
+                <text class="ros-value" x="${c}" y="${c + 3}">${average}</text>
+                <text class="ros-unit" x="${c}" y="${c + 17}">/ 4</text>
             </svg>
         </figure>`;
 }

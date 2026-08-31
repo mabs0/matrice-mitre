@@ -8,7 +8,7 @@
     width: 100%;
     max-width: 1040px;
     margin: 0 auto;
-    padding: 56px 24px 64px;
+    padding: 40px 24px 64px;
 }
 
 /* ------------------------------------------- matrice d'exemple en arrière-plan
@@ -94,11 +94,13 @@
    cartes, qui sont ce pour quoi on est venu. */
 
 .home-first {
-    min-height: calc(100dvh - 48px - 56px);   /* barre haute, marge haute de .home-inner */
+    min-height: calc(100dvh - 48px - 40px);   /* barre haute, marge haute de .home-inner */
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: clamp(20px, 4vh, 40px);
+    /* Cale vers le haut plutôt qu'au centre : la hauteur ainsi récupérée revient
+       à la rosace, qui est ce qu'on vient regarder. */
+    justify-content: flex-start;
+    gap: clamp(14px, 2.4vh, 26px);
 }
 
 .home-hero {
@@ -106,7 +108,7 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: clamp(10px, 1.6vh, 16px);
+    gap: clamp(6px, 1vh, 12px);
 }
 
 /* Fréquentation, à la place du bandeau de version — lequel redisait le badge de
@@ -152,14 +154,21 @@
 /* C'est la **hauteur** qui pilote, pas la largeur : la rosace doit pouvoir
    rendre de la place quand l'écran est bas, pour que les deux cartes restent
    visibles. Le viewBox garde les proportions, la largeur suit. Le plancher est
-   le seuil sous lequel les noms de tactiques cessent d'être lisibles. */
+   le seuil sous lequel les noms de tactiques cessent d'être lisibles.
+
+   `max-width: 100%` seul ne suffit pas : quand la largeur bride une image de
+   hauteur fixe, la hauteur ne suit pas et le dessin se déforme. `height: auto`
+   au-delà d'un certain rapport largeur/hauteur rend la main à la largeur. */
 .rosace {
     display: block;
     margin: 0 auto;
-    height: clamp(190px, 34vh, 370px);
+    height: clamp(220px, 46vh, 520px);
     width: auto;
     max-width: 100%;
     overflow: visible;
+}
+@media (max-aspect-ratio: 1/1) {
+    .rosace { height: auto; width: 100%; }
 }
 
 /* La toile a son propre ton, `--toile` : les couleurs de bordure sont bien trop
@@ -231,17 +240,20 @@
 
 .ros-hub { fill: var(--surface); stroke: var(--border); stroke-width: 0.6; }
 
+/* La note centrale est le chiffre que tout le monde retient : elle occupe le
+   moyeu au lieu de s'y perdre. */
 .ros-value {
     text-anchor: middle;
     fill: var(--text);
-    font-size: 22px;
+    font-size: 26px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
 }
 .ros-unit {
     text-anchor: middle;
     fill: var(--text-mute);
-    font-size: 8px;
+    font-size: 9px;
     letter-spacing: 0.08em;
 }
 
@@ -291,21 +303,29 @@
 }
 
 /* Les deux cartes sont traitées à égalité.
-   L'une portait la couleur d'accent en bordure et en fond, l'autre non : mis
+   L'une portait la couleur d'accent en bordure et en fond, l'autre non : mises
    côte à côte, cela se lisait comme un choix déjà fait plutôt que comme deux
-   chemins ouverts. C'est le bouton qui porte l'accent, pas la carte. */
+   chemins ouverts. C'est le bouton qui porte l'accent, pas la carte.
+
+   Reste le relief qu'elles avaient : un fond très légèrement teinté d'accent et
+   la bordure qui s'allume au survol, sur les deux à égalité cette fois. Une
+   carte parfaitement plate ne se distinguait plus assez du fond de page. */
 .action-card {
     display: flex;
     flex-direction: column;
     gap: 12px;
     text-align: left;
     padding: 24px;
-    background: var(--surface);
+    background: linear-gradient(180deg, var(--accent-wash), transparent 70%), var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.action-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.action-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
 
 .action-card .glyph { display: block; color: var(--accent); }
 .action-card .glyph svg { display: block; width: 26px; height: 26px; }

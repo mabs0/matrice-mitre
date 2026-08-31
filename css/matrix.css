@@ -17,7 +17,10 @@
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 316px minmax(0, 1fr);
+    /* Assez large pour que la rosace se lise : sous ~350 px, les noms de
+       tactiques autour du cercle deviennent des traits gris. C'est le dessin qui
+       fixe la largeur de la colonne, pas l'inverse. */
+    grid-template-columns: 372px minmax(0, 1fr);
     gap: 10px;
     padding: 10px;
     background: var(--bg);
@@ -61,7 +64,11 @@
 }
 
 .dash-panel .panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 13px; }
-.dash-panel[data-panel="rosace"] .panel-body { overflow: visible; padding: 6px 4px 10px; }
+/* La rosace prend toute la largeur du panneau, marges réduites au minimum : la
+   couronne de libellés est déjà comprise dans son viewBox, il n'y a rien à
+   ajouter autour. */
+.dash-panel[data-panel="rosace"] .panel-body { overflow: visible; padding: 2px 2px 6px; }
+.dash-panel[data-panel="rosace"] .rosace { height: auto; width: 100%; }
 
 .panel-note { margin: 0; font-size: 0.68rem; line-height: 1.5; color: var(--text-mute); }
 .panel-body #dash-cve { width: 100%; margin-bottom: 8px; }
@@ -109,12 +116,23 @@
 #dash[data-expanded="mitigations"] [data-panel="cve"] { display: none; }
 
 /* En grand, la rosace occupe la surface au lieu de rester à sa taille de
-   vignette — c'est tout l'intérêt de l'agrandir. */
+   vignette — c'est tout l'intérêt de l'agrandir.
+
+   Le piège : `height: 78vh` sur un SVG dont la largeur suit le rapport du
+   viewBox donne une largeur qui dépasse largement le panneau, et le dessin
+   sortait du cadre. `object-fit: contain` ne s'applique pas — un SVG en ligne
+   n'est pas un élément remplacé.
+
+   La bonne prise est dans le SVG lui-même : on lui donne toute la boîte, et son
+   `preserveAspectRatio` (« xMidYMid meet » par défaut) met le tracé à l'échelle
+   pour qu'il y tienne, centré et sans déformation. Le cadre décide, le dessin
+   s'y range. */
 #dash[data-expanded="rosace"] [data-panel="rosace"] .panel-body {
-    display: grid;
-    place-items: center;
+    overflow: hidden;
+    padding: 14px;
 }
-#dash[data-expanded="rosace"] .rosace { height: min(78vh, 100%); }
+#dash[data-expanded="rosace"] .rosace-figure { width: 100%; height: 100%; min-height: 0; }
+#dash[data-expanded="rosace"] .rosace { width: 100%; height: 100%; }
 
 /* --------------------------------------------- liste des mitigations notées */
 
@@ -136,8 +154,25 @@
     cursor: pointer;
 }
 .mit-row:hover { background: var(--surface-3); border-color: var(--border); }
-.mit-row:disabled { cursor: default; opacity: 0.55; }
-.mit-row:disabled:hover { background: none; border-color: transparent; }
+.mit-row.selected { background: var(--accent-wash); border-color: var(--accent); }
+
+/* Action de la ligne sélectionnée. Elle n'apparaît que là : proposée sur les
+   quarante-quatre lignes, elle ferait de la liste un mur de boutons. */
+.mit-quiz {
+    display: block;
+    width: 100%;
+    margin: 2px 0 4px;
+    padding: 5px 6px 5px 38px;
+    background: none;
+    border: 0;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 0.71rem;
+    text-align: left;
+    cursor: pointer;
+}
+.mit-quiz:hover { text-decoration: underline; }
+.mit-hint { margin: 2px 0 4px; padding-left: 38px; font-size: 0.68rem; line-height: 1.45; color: var(--text-mute); }
 
 .mit-score {
     flex: 0 0 auto;
@@ -283,6 +318,22 @@
     min-width: max-content;
 }
 
+/* Plein écran : la grille tient dans la largeur, sans défilement horizontal.
+   `min-width: max-content` l'en empêchait — c'est lui qui impose la largeur du
+   plus long libellé. On le lève, et les textes passent à la ligne. */
+#matrix-grid.fit { min-width: 0; }
+#matrix-grid.fit .cell,
+#matrix-grid.fit .tactic-head { overflow-wrap: anywhere; hyphens: auto; }
+/* La note est posée en absolu dans l'angle : on lui réserve sa place à droite,
+   sinon l'identifiant passe dessous dans une colonne étroite. */
+#matrix-grid.fit .cell { padding: 3px 16px 3px 4px; }
+#matrix-grid.fit .tactic-head { padding: 6px 3px 5px; }
+/* Le compteur de techniques est le premier à sauter quand la colonne devient
+   étroite : c'est un repère, pas une donnée qu'on vient chercher. */
+@media (max-width: 1500px) {
+    #matrix-grid.fit .tactic-head .t-meta { display: none; }
+}
+
 .tactic-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 .tactic-head {
@@ -392,8 +443,14 @@
    Déclarés après la forme des cases, sous-techniques comprises : à
    spécificité égale, c'est l'ordre qui décide, et l'état doit gagner. */
 
+/* Surlignage d'une mitigation, déclenché par sa ligne dans la liste : ce qu'elle
+   couvre ressort, le reste s'efface. C'est la réponse à « celle-là, elle protège
+   quoi ? », et elle se lit sur la carte, pas dans une liste d'identifiants. */
+.cell.dimmed { opacity: 0.18; }
+.cell.highlighted { outline-color: var(--accent); z-index: 4; }
+
 /* Correspondance de recherche : teinte réservée, pour ne pas se confondre avec
-   un niveau de maturité. */
+   un niveau de maturité ni avec le surlignage d'une mitigation. */
 .cell.match { outline-color: var(--find); z-index: 4; }
 
 /* ---------------------------------------------------------------- messages */

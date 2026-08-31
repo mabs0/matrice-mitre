@@ -51,15 +51,6 @@ body {
 }
 .brand-mascot { width: 22px; height: 22px; flex: none; }
 
-.brand small {
-    align-self: flex-end;
-    padding-bottom: 2px;
-    font-weight: 500;
-    font-size: 0.62rem;
-    color: var(--text-mute);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
 
 /* Onglets de layer, dans l'esprit Tidal Cyber */
 #layer-tabs { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
@@ -330,13 +321,11 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
 /* ------------------------------------------------------------ écrans étroits
 
    Un seul point de rupture pour la coquille. La barre haute est le point
-   sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. On y
-   retire le sous-titre de la marque, et le badge de version se réduit à son
-   numéro — il n'apparaît que sur l'accueil, où il ne dispute la place à
-   personne, mais la place est comptée. */
+   sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. Le
+   badge de version s'y réduit à son numéro — il n'apparaît que sur l'accueil,
+   où il ne dispute la place à personne, mais la place est comptée. */
 @media (max-width: 560px) {
     #topbar { gap: 9px; padding: 0 10px; }
-    .brand small { display: none; }
     .version-badge .vb-long { display: none; }
     .layer-tab { max-width: none; }
 

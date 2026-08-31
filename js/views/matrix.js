@@ -31,6 +31,7 @@ const view = {
     platformsReady: false,
     showSubs: false,
     expanded: null,            // nom du panneau en plein écran, ou null
+    highlight: "",             // mitigation sélectionnée dans la liste
 };
 
 /** Bouton d'agrandissement, en haut à droite de chaque panneau. */
@@ -166,6 +167,10 @@ function toggleExpand(app, nom) {
         button.title = actif ? "Revenir au tableau de bord" : "Agrandir";
         button.setAttribute("aria-label", button.title);
     }
+
+    // La matrice change de régime de colonnes selon qu'elle est en plein écran
+    // ou dans son panneau : il faut la redessiner.
+    paint(app);
 }
 
 /**
@@ -358,10 +363,29 @@ function paint(app) {
     $("#platform-count").textContent = view.platforms.size === data.platforms.length
         ? "tout" : String(view.platforms.size);
 
-    // Colonnes resserrées : à 146 px, quinze tactiques faisaient plus de deux
-    // largeurs d'écran, et la matrice se lisait par fragments — or ce qu'on lui
-    // demande, c'est de montrer d'un coup d'œil où sont les zones faibles.
-    grid.style.gridTemplateColumns = `repeat(${data.tactics.length}, minmax(112px, 1fr))`;
+    // Deux régimes de colonnes.
+    //
+    // En plein écran, la matrice doit tenir tout entière : les colonnes se
+    // partagent la largeur à parts égales, sans plancher, et les libellés
+    // passent à la ligne autant qu'il le faut. C'est le seul moyen de voir les
+    // zones faibles d'un coup d'œil — but de cet écran.
+    //
+    // Dans le tableau de bord, le panneau ne fait que la largeur restante :
+    // écraser quinze colonnes là-dedans les rendrait illisibles. On garde donc
+    // un plancher et le défilement horizontal.
+    // Une mitigation peut ne viser qu'une sous-technique : on surligne alors
+    // aussi la technique parente, sinon la case visible resterait éteinte.
+    let highlighted = null;
+    if (view.highlight) {
+        highlighted = new Set(data.mitigationById.get(view.highlight)?.techniques ?? []);
+        for (const id of [...highlighted]) highlighted.add(String(id).split(".")[0]);
+    }
+
+    const plein = view.expanded === "matrix";
+    grid.classList.toggle("fit", plein);
+    grid.style.gridTemplateColumns = plein
+        ? `repeat(${data.tactics.length}, minmax(0, 1fr))`
+        : `repeat(${data.tactics.length}, minmax(112px, 1fr))`;
     grid.innerHTML = "";
 
     let visibleTotal = 0;
@@ -387,14 +411,14 @@ function paint(app) {
         column.appendChild(head);
 
         for (const tech of shown) {
-            column.appendChild(cellFor(app, tech, scores, query));
+            column.appendChild(cellFor(app, tech, scores, query, highlighted));
 
             if (view.showSubs && tech.subs.length) {
                 const box = document.createElement("div");
                 box.className = "subs";
                 for (const sub of tech.subs) {
                     if (!matchesPlatform(sub)) continue;
-                    box.appendChild(cellFor(app, sub, scores, query, true));
+                    box.appendChild(cellFor(app, sub, scores, query, highlighted, true));
                 }
                 if (box.children.length) column.appendChild(box);
             }
@@ -437,7 +461,11 @@ function paintSide(app) {
  *
  * Les non évaluées restent listées, en gris : ce qui reste à faire fait partie
  * de l'état des lieux, et les masquer donnerait une liste qui rétrécit à mesure
- * qu'on avance. Un clic ouvre le questionnaire sur la mitigation.
+ * qu'on avance.
+ *
+ * Un clic surligne dans la matrice les techniques que la mitigation couvre —
+ * c'est la question qu'on se pose devant cette liste : « celle-là, elle protège
+ * quoi ? ». La ligne sélectionnée offre alors d'ouvrir son questionnaire.
  */
 function paintMitigations(app) {
     const host = $("#dash-mitigations");
@@ -448,7 +476,8 @@ function paintMitigations(app) {
 
     host.innerHTML = `
         <p class="panel-note">${evaluees.length} évaluée${evaluees.length > 1 ? "s" : ""}
-            sur ${app.data.mitigations.length}</p>
+            sur ${app.data.mitigations.length}${view.highlight
+                ? ` · <b>${esc(view.highlight)}</b> surlignée` : ""}</p>
         <ul class="mit-list">
             ${app.data.mitigations.map(m => {
                 const level = levels.get(m.id);
@@ -458,23 +487,41 @@ function paintMitigations(app) {
                 // atténuer : il n'y a pas de maturité à mesurer, donc pas de
                 // questionnaire à ouvrir.
                 const questionnable = QUESTIONNAIRES.has(m.id);
+                const choisie = view.highlight === m.id;
                 return `<li>
-                    <button class="mit-row" ${questionnable ? `data-mitigation="${esc(m.id)}"` : "disabled"}
-                            title="${esc(m.id)} — ${esc(m.name)}${questionnable ? "" : " · sans questionnaire"}">
+                    <button class="mit-row${choisie ? " selected" : ""}" data-mitigation="${esc(m.id)}"
+                            aria-pressed="${choisie}"
+                            title="${esc(m.id)} — ${esc(m.name)}">
                         <span class="${classe}">${note}</span>
                         <span class="mit-id">${esc(m.id)}</span>
                         <span class="mit-name">${esc(m.name)}</span>
                     </button>
+                    ${choisie && questionnable
+                        ? `<button class="mit-quiz" data-quiz="${esc(m.id)}">Répondre au questionnaire →</button>`
+                        : ""}
+                    ${choisie && !questionnable
+                        ? `<p class="mit-hint">Pas de questionnaire : cette catégorie décrit les cas
+                           où l'on choisit de ne pas atténuer.</p>`
+                        : ""}
                 </li>`;
             }).join("")}
         </ul>`;
 
     for (const row of $$("[data-mitigation]")) {
-        row.onclick = () => app.show("quiz", { mitigation: row.dataset.mitigation });
+        // Re-cliquer la ligne surlignée éteint le surlignage : le geste qui
+        // sélectionne est celui qui désélectionne.
+        row.onclick = () => {
+            view.highlight = view.highlight === row.dataset.mitigation ? "" : row.dataset.mitigation;
+            paintMitigations(app);
+            paint(app);
+        };
+    }
+    for (const button of $$("[data-quiz]")) {
+        button.onclick = () => app.show("quiz", { mitigation: button.dataset.quiz });
     }
 }
 
-function cellFor(app, tech, scores, query, isSub = false) {
+function cellFor(app, tech, scores, query, highlighted, isSub = false) {
     // Une sous-technique hérite de l'état de sa parente : la notation se fait
     // au niveau des mitigations, qui sont rattachées à la technique parente.
     const parentId = isSub ? String(tech.id).split(".")[0] : tech.id;
@@ -491,6 +538,11 @@ function cellFor(app, tech, scores, query, isSub = false) {
         button.classList.add(`lvl-${cell.level}`);
     } else {
         button.classList.add("unscored");
+    }
+
+    if (highlighted) {
+        if (highlighted.has(tech.id)) button.classList.add("highlighted");
+        else button.classList.add("dimmed");
     }
 
     if (query && (tech.id.toLowerCase().includes(query) || tech.name.toLowerCase().includes(query))) {
@@ -631,4 +683,6 @@ export function resetMatrixView() {
     view.query = "";
     view.showSubs = false;
     view.platformsReady = false;
+    view.highlight = "";
+    view.expanded = null;
 }
