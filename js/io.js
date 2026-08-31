@@ -12,6 +12,10 @@ import { buildWorkbook, readWorkbook, loadExcel } from "./excel.js";
 import { buildMatrixScores, mitigationLevels } from "./scoring.js";
 import { download, slug } from "./ui.js";
 
+/* En-tête des fichiers chiffrés. C'est un identifiant de format, pas une marque :
+   il ne suit pas le renommage du projet en MAPTRIX, sans quoi les évaluations
+   déjà exportées cesseraient d'être reconnues comme chiffrées. Même raison pour
+   `SCHEMA` dans layer.js. */
 const ENCRYPTED_PREFIX = "CTRM1:";
 
 /* ------------------------------------------------------------------ export */
@@ -25,7 +29,7 @@ const ENCRYPTED_PREFIX = "CTRM1:";
  * un dossier de téléchargements. L'organisation, elle, est ce qui distingue deux
  * évaluations qu'on garde côte à côte.
  */
-const BASE_NAME = "matrice-mitre";
+const BASE_NAME = "maptrix";
 
 export function exportName(layer) {
     const org = layer?.respondent?.org?.trim();

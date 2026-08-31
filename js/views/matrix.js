@@ -19,7 +19,6 @@ const view = {
     platforms: new Set(),      // toutes cochées au départ ; vide = tout masqué
     platformsReady: false,
     showSubs: false,
-    highlight: "",             // identifiant de mitigation à surligner
 };
 
 export function renderMatrix(app) {
@@ -42,10 +41,6 @@ export function renderMatrix(app) {
                 </button>
                 <div class="dropdown-panel" id="platform-panel"></div>
             </div>
-
-            <select id="matrix-mitigation" style="max-width:250px;">
-                <option value="">Surligner une mitigation…</option>
-            </select>
 
             <label class="tool-group" style="cursor:pointer;">
                 <input type="checkbox" id="matrix-subs" ${view.showSubs ? "checked" : ""}>
@@ -76,7 +71,6 @@ export function renderMatrix(app) {
 
     buildLegend();
     buildPlatformFilter(app);
-    buildMitigationSelect(app);
     buildMethodPanel(app);
     buildExportPanel(app);
 
@@ -162,23 +156,6 @@ function buildPlatformFilter(app) {
     });
 }
 
-/* ---------------------------------------------------- surlignage mitigation */
-
-function buildMitigationSelect(app) {
-    const select = $("#matrix-mitigation");
-    const levels = mitigationLevels(app.layer);
-
-    for (const m of app.data.mitigations) {
-        const option = document.createElement("option");
-        option.value = m.id;
-        const level = levels.has(m.id) ? ` — niveau ${levels.get(m.id)}` : "";
-        option.textContent = `[${m.id}] ${m.name}${level}`;
-        select.appendChild(option);
-    }
-    select.value = view.highlight;
-    select.onchange = e => { view.highlight = e.target.value; paint(app); };
-}
-
 /* ------------------------------------------------------- méthode de notation */
 
 function buildMethodPanel(app) {
@@ -202,21 +179,11 @@ function buildMethodPanel(app) {
          voyage avec le layer et figure dans l'export.</div>`;
 
     $$('#method-panel input[name="scoring"]').forEach(radio => {
-        radio.onchange = () => { app.layer.scoring = radio.value; refreshMitigationLabels(app); paint(app); };
+        radio.onchange = () => { app.layer.scoring = radio.value; paint(app); };
     });
     $$('#method-panel input[name="aggregation"]').forEach(radio => {
         radio.onchange = () => { app.layer.aggregation = radio.value; paint(app); };
     });
-}
-
-function refreshMitigationLabels(app) {
-    const levels = mitigationLevels(app.layer);
-    for (const option of $$("#matrix-mitigation option")) {
-        if (!option.value) continue;
-        const m = app.data.mitigationById.get(option.value);
-        const level = levels.has(m.id) ? ` — niveau ${levels.get(m.id)}` : "";
-        option.textContent = `[${m.id}] ${m.name}${level}`;
-    }
 }
 
 /* ------------------------------------------------------------------ exports */
@@ -311,15 +278,10 @@ function paint(app) {
     $("#platform-count").textContent = view.platforms.size === data.platforms.length
         ? "tout" : String(view.platforms.size);
 
-    // Une mitigation peut ne viser qu'une sous-technique : on surligne alors
-    // aussi la technique parente, sinon la case visible resterait éteinte.
-    let highlighted = null;
-    if (view.highlight) {
-        highlighted = new Set(data.mitigationById.get(view.highlight)?.techniques ?? []);
-        for (const id of [...highlighted]) highlighted.add(String(id).split(".")[0]);
-    }
-
-    grid.style.gridTemplateColumns = `repeat(${data.tactics.length}, minmax(146px, 1fr))`;
+    // Colonnes resserrées : à 146 px, quinze tactiques faisaient plus de deux
+    // largeurs d'écran, et la matrice se lisait par fragments — or ce qu'on lui
+    // demande, c'est de montrer d'un coup d'œil où sont les zones faibles.
+    grid.style.gridTemplateColumns = `repeat(${data.tactics.length}, minmax(112px, 1fr))`;
     grid.innerHTML = "";
 
     let visibleTotal = 0;
@@ -345,14 +307,14 @@ function paint(app) {
         column.appendChild(head);
 
         for (const tech of shown) {
-            column.appendChild(cellFor(app, tech, scores, query, highlighted));
+            column.appendChild(cellFor(app, tech, scores, query));
 
             if (view.showSubs && tech.subs.length) {
                 const box = document.createElement("div");
                 box.className = "subs";
                 for (const sub of tech.subs) {
                     if (!matchesPlatform(sub)) continue;
-                    box.appendChild(cellFor(app, sub, scores, query, highlighted, true));
+                    box.appendChild(cellFor(app, sub, scores, query, true));
                 }
                 if (box.children.length) column.appendChild(box);
             }
@@ -371,7 +333,7 @@ function paint(app) {
 const matchesPlatform = tech =>
     tech.platforms.length === 0 || tech.platforms.some(p => view.platforms.has(p));
 
-function cellFor(app, tech, scores, query, highlighted, isSub = false) {
+function cellFor(app, tech, scores, query, isSub = false) {
     // Une sous-technique hérite de l'état de sa parente : la notation se fait
     // au niveau des mitigations, qui sont rattachées à la technique parente.
     const parentId = isSub ? String(tech.id).split(".")[0] : tech.id;
@@ -388,11 +350,6 @@ function cellFor(app, tech, scores, query, highlighted, isSub = false) {
         button.classList.add(`lvl-${cell.level}`);
     } else {
         button.classList.add("unscored");
-    }
-
-    if (highlighted) {
-        if (highlighted.has(tech.id)) button.classList.add("highlighted");
-        else button.classList.add("dimmed");
     }
 
     if (query && (tech.id.toLowerCase().includes(query) || tech.name.toLowerCase().includes(query))) {
@@ -523,16 +480,12 @@ function openTechnique(app, tech, scores) {
 
 /** Rafraîchit la matrice si elle est déjà construite (retour du questionnaire). */
 export function repaintMatrix(app) {
-    if ($("#matrix-grid")) {
-        refreshMitigationLabels(app);
-        paint(app);
-    }
+    if ($("#matrix-grid")) paint(app);
 }
 
 /** Remet les filtres à zéro : appelé quand on change de layer. */
 export function resetMatrixView() {
     view.query = "";
-    view.highlight = "";
     view.showSubs = false;
     view.platformsReady = false;
 }

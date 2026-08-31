@@ -9,68 +9,90 @@
    ========================================================================= */
 
 import { esc, $, toast, openModal, closeModal } from "../ui.js";
-import { totalQuestions, QUESTIONNAIRES } from "../catalog.js";
-import { savedQuestions } from "../shared-questions.js";
 import { createLayer, nextTarget, progress } from "../layer.js";
 import { readLayerFile, isEncrypted } from "../io.js";
 import { rosace, matrixBackdrop } from "./home-visuals.js";
 
+/* Les deux entrées portaient un losange plein et un losange vide. Côte à côte,
+   ces deux états d'un même signe se lisent comme « sélectionné » et « non
+   sélectionné » — alors que ce sont deux actions distinctes, dont aucune n'est
+   un choix déjà fait. Deux dessins sans rapport l'un avec l'autre lèvent
+   l'ambiguïté : on crée d'un côté, on ouvre de l'autre. */
+const GLYPH_NEW = `
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M12 8.5v7M8.5 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>`;
+
+const GLYPH_OPEN = `
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 15.5V4m0 0L8.2 7.8M12 4l3.8 3.8" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.5 14v4.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V14" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round"/>
+    </svg>`;
+
+/**
+ * Emplacement du compteur de fréquentation.
+ *
+ * Il prend la place du bandeau de version, qui redisait ce que porte déjà le
+ * badge en haut à droite. La valeur n'est pas affichée tant qu'aucune source ne
+ * l'alimente : un chiffre inventé sur une page publique se lit comme un chiffre
+ * vrai. Brancher une source revient à écrire le nombre dans `#home-visitors`.
+ */
+function visitorSlot() {
+    return `<p class="home-visitors" id="home-visitors" hidden><b></b> visiteurs ce mois-ci</p>`;
+}
+
 export function renderHome(app) {
     const { data } = app;
-    // Les questions communes à plusieurs mitigations ne sont posées qu'une fois :
-    // c'est ce nombre-là qu'il faut annoncer, pas le total du classeur.
-    const catalogQuestions = totalQuestions() - savedQuestions();
 
     $("#view-home").innerHTML = `
         ${matrixBackdrop(data)}
         <div class="home-inner">
-            <div class="home-hero">
-                <div class="hero-text">
-                    <span class="home-eyebrow">
-                        MITRE ATT&amp;CK Enterprise <b>v${esc(data.version)}</b><span class="eb-long"> · relu à chaque chargement</span>
-                    </span>
+            <div class="home-first">
+                <div class="home-hero">
+                    ${visitorSlot()}
                     <h1>Évaluez la <em>maturité cyber</em> de votre organisation<br>sur la matrice MITRE ATT&amp;CK</h1>
                     <p class="home-lead">
                         L'outil s'appuie sur les ${data.counts.mitigations} mesures d'atténuation d'ATT&amp;CK Enterprise.
-                        Chacune est notée de 0 à 4 sur une échelle inspirée du CMMI et de l'échelle SSI de l'ANSSI,
-                        à partir d'un questionnaire progressif. Le résultat colore la matrice et donne
-                        une cartographie de votre couverture défensive.
+                        Chacune est notée de 0 à 4 sur une échelle inspirée du CMMI et de l'échelle SSI de l'ANSSI.
+                        Le résultat colore la matrice et donne une cartographie de votre couverture défensive.
                     </p>
-                </div>
-                ${rosace(data)}
-            </div>
-
-            <div class="home-actions">
-                <div class="action-card primary">
-                    <span class="glyph">◆</span>
-                    <h2>Nouveau layer</h2>
-                    <p>
-                        Démarrez une évaluation vierge et répondez au questionnaire mitigation par mitigation.
-                        L'avancement s'affiche en continu et la matrice se remplit au fil des réponses.
-                    </p>
-                    <button class="btn btn-primary" id="home-new">Créer un layer</button>
+                    ${rosace(data)}
                 </div>
 
-                <div class="action-card">
-                    <span class="glyph">◇</span>
-                    <h2>Ouvrir un layer existant</h2>
-                    <p>
-                        Reprenez une évaluation en important son fichier. Si toutes les questions sont
-                        déjà renseignées, la matrice s'affiche directement ; sinon on reprend à la
-                        première question sans réponse.
-                    </p>
-                    <div class="drop-zone" id="home-drop">
-                        <b>Choisir un fichier</b> ou le déposer ici<br>
-                        un fichier exporté par cet outil, JSON ou Excel
+                <div class="home-actions">
+                    <div class="action-card">
+                        <span class="glyph">${GLYPH_NEW}</span>
+                        <h2>Nouveau layer</h2>
+                        <p>
+                            Démarrez une évaluation vierge et répondez au questionnaire mitigation par
+                            mitigation. La matrice se remplit au fil des réponses.
+                        </p>
+                        <button class="btn btn-primary" id="home-new">Créer un layer</button>
                     </div>
-                    <input type="file" id="home-file" class="sr-only" accept=".json,.xlsx,.xls">
+
+                    <div class="action-card">
+                        <span class="glyph">${GLYPH_OPEN}</span>
+                        <h2>Ouvrir un layer existant</h2>
+                        <p>
+                            Reprenez une évaluation en important son fichier. On repart à la première
+                            question sans réponse, ou droit à la matrice si tout est renseigné.
+                        </p>
+                        <div class="drop-zone" id="home-drop">
+                            <b>Choisir un fichier</b> ou le déposer ici<br>
+                            un fichier exporté par cet outil, JSON ou Excel
+                        </div>
+                        <input type="file" id="home-file" class="sr-only" accept=".json,.xlsx,.xls">
+                    </div>
                 </div>
             </div>
 
-            <div class="home-stats">
-                <div class="stat"><span class="v">${data.counts.mitigations}</span><span class="k">mitigations</span></div>
-                <div class="stat"><span class="v">${data.counts.techniques}</span><span class="k">techniques</span></div>
-                <div class="stat"><span class="v">${data.counts.subTechniques}</span><span class="k">sous-techniques</span></div>
+            <div class="home-figures">
+                <div class="figure"><span class="v">${data.counts.mitigations}</span><span class="k">mitigations</span></div>
+                <div class="figure"><span class="v">${data.counts.techniques}</span><span class="k">techniques</span></div>
+                <div class="figure"><span class="v">${data.counts.subTechniques}</span><span class="k">sous-techniques</span></div>
             </div>
 
             <ol class="home-steps">
@@ -78,8 +100,8 @@ export function renderHome(app) {
                     <span class="step-num">1</span>
                     <h3>Questionnaire</h3>
                     <p>
-                        ${catalogQuestions} questions progressives sur ${QUESTIONNAIRES.size} mitigations.
-                        Un « Oui » fait avancer, un « Non » clôt la mitigation et fixe sa note.
+                        Le nombre de questions s'adapte à votre organisation : un « Oui » fait avancer,
+                        un « Non » clôt la mitigation et fixe sa note.
                     </p>
                 </li>
                 <li class="step">
@@ -200,7 +222,9 @@ async function importFile(app, file) {
         toast(`« ${layer.name} » importé — ${state.completeMitigations}/${state.mitigations} mitigations traitées, reprise en cours.`);
         app.show("quiz");
     } catch (err) {
-        toast(`Import impossible : ${err.message}`, "error");
+        // Les messages sont déjà écrits pour être lus tels quels : le détail
+        // technique part en console, côté io.js et excel.js.
+        toast(`Import impossible — ${err.message}.`, "error");
     }
 }
 

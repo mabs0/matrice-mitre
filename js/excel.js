@@ -27,8 +27,8 @@ const META_SHEET = "Métadonnées";
    navigateur n'est pas seul à produire le fichier — le banc l'écrit sans CSS —
    et une assertion vérifie que les deux jeux ne divergent pas. */
 
-export const RAMPE = ["FFFEA195", "FFEF852E", "FFC27B00", "FF53890C", "FF067138"];
-const ENCRE = ["FF0B0B0B", "FF0B0B0B", "FF0B0B0B", "FF0B0B0B", "FFFFFFFF"];
+export const RAMPE = ["FFCE3B31", "FFEF8A2F", "FFF1ED83", "FFA5D861", "FF0F9A3C"];
+const ENCRE = ["FFFFFFFF", "FF0B0B0B", "FF0B0B0B", "FF0B0B0B", "FF0B0B0B"];
 
 const ENTETE = "FF2A3140";          // bandeau d'en-tête, texte blanc
 const NEUTRE = "FFEFEFEB";          // surface-3 du thème clair
@@ -234,7 +234,7 @@ function barres(ws, colonne, premiere, derniere) {
  */
 export function buildWorkbook(ExcelJS, layer, data, scores, levels) {
     const wb = new ExcelJS.Workbook();
-    wb.creator = "CTRM";
+    wb.creator = "MAPTRIX";
     wb.created = new Date();
 
     feuilleReponses(wb, layer, levels);
@@ -567,10 +567,12 @@ export function readWorkbook(wb, { name } = {}) {
     const layer = createLayer({ name });
     const ws = wb.getWorksheet(RESPONSE_SHEET);
 
+    // Le message reste court : à l'écran, « Feuille "Réponses" absente » ne dit
+    // rien à qui n'a jamais ouvert le classeur produit. Le détail part en
+    // console, où il sert à diagnostiquer.
     if (!ws) {
-        throw new Error(
-            `Feuille « ${RESPONSE_SHEET} » absente. Attendu : un classeur exporté par cet outil.`
-        );
+        console.warn(`Import : feuille « ${RESPONSE_SHEET} » absente du classeur.`);
+        throw new Error("format non pris en charge");
     }
 
     // Les colonnes sont retrouvées par leur intitulé, pas par leur rang : on
@@ -609,10 +611,11 @@ export function readWorkbook(wb, { name } = {}) {
     }
 
     if (!found) {
-        throw new Error(
-            `La feuille « ${RESPONSE_SHEET} » ne contient aucune réponse exploitable. ` +
-            "Attendu : les colonnes Mitigation, Numéro et Réponse."
+        console.warn(
+            `Import : la feuille « ${RESPONSE_SHEET} » ne contient aucune réponse exploitable ` +
+            "(colonnes attendues : Mitigation, N°, Réponse)."
         );
+        throw new Error("aucune réponse à reprendre dans ce fichier");
     }
     layer.answers = sanitiseAnswers(layer.answers);
     lireMetadonnees(wb, layer);

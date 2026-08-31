@@ -28,12 +28,17 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    /* La bande unique se cale vers le haut, derrière le titre, au lieu d'être
+       centrée sur toute la hauteur : c'est là qu'il reste de la place, les
+       cartes et les chiffres étant opaques. */
+    justify-content: flex-start;
+    padding-top: 26px;
     align-items: flex-start;
     pointer-events: none;
     opacity: var(--fond);
-    mask-image: radial-gradient(ellipse 62% 54% at 46% 34%,
-        transparent 0%, rgba(0, 0, 0, 0.28) 46%, #000 82%);
+    /* L'échancrure suit le contenu, désormais centré. */
+    mask-image: radial-gradient(ellipse 58% 46% at 50% 30%,
+        transparent 0%, rgba(0, 0, 0, 0.3) 48%, #000 84%);
 }
 /* La trame n'est définie qu'ici, et n'est pas rendue : seules les bandes la
    reprennent par référence. Surtout pas de `display: none` — voir le markup. */
@@ -52,7 +57,9 @@
 .bd-head-text {
     fill: var(--text-dim);
     font-family: var(--font);
-    font-size: 7.5px;
+    /* Suit l'agrandissement des cases : à 7,5 px sur des colonnes de 92 px, le
+       nom de tactique n'était plus qu'un trait gris. */
+    font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.02em;
 }
@@ -76,48 +83,61 @@
     to { transform: translateX(0); }
 }
 
-/* --------------------------------------------------------------------- hero */
+/* --------------------------------------------------------------------- hero
+
+   Tout est centré, dans l'ordre de lecture : titre, phrase d'accroche, rosace,
+   puis les deux entrées.
+
+   Contrainte de tenue : « Nouveau layer » et « Ouvrir un layer existant »
+   doivent rester entièrement visibles sans défiler. C'est la rosace qui cède la
+   place quand l'écran est bas — sa hauteur est bornée en `vh` —, jamais les
+   cartes, qui sont ce pour quoi on est venu. */
+
+.home-first {
+    min-height: calc(100dvh - 48px - 56px);   /* barre haute, marge haute de .home-inner */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(20px, 4vh, 40px);
+}
 
 .home-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 330px;
-    gap: 44px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    margin-bottom: 44px;
+    text-align: center;
+    gap: clamp(10px, 1.6vh, 16px);
 }
-.hero-text { min-width: 0; }
 
-.home-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
+/* Fréquentation, à la place du bandeau de version — lequel redisait le badge de
+   la barre haute. Reste masqué tant qu'aucune source ne l'alimente. */
+.home-visitors {
+    margin: 0;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    padding: 5px 12px;
-    border-radius: 20px;
-    margin-bottom: 18px;
+    color: var(--text-mute);
 }
-.home-eyebrow b { color: var(--accent); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.home-visitors b { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.home-visitors[hidden] { display: none; }
 
 .home-hero h1 {
-    font-size: clamp(1.6rem, 3.4vw, 2.35rem);
+    font-size: clamp(1.55rem, 3.6vw, 2.4rem);
     line-height: 1.15;
     letter-spacing: -0.02em;
-    margin: 0 0 14px;
+    margin: 0;
     font-weight: 700;
+    text-wrap: balance;
 }
 .home-hero h1 em { font-style: normal; color: var(--accent); }
 
 .home-lead {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     line-height: 1.6;
     color: var(--text-dim);
-    max-width: 620px;
+    max-width: 660px;
     margin: 0;
+    text-wrap: pretty;
 }
 
 /* ------------------------------------------------------------------ rosace
@@ -127,9 +147,20 @@
    chargement, les sommets apparaissent ensuite un à un — c'est cette éclosion
    qui rend l'accueil vivant. */
 
-.rosace-figure { margin: 0; }
+.rosace-figure { margin: 0; width: 100%; }
 
-.rosace { display: block; width: 100%; height: auto; overflow: visible; }
+/* C'est la **hauteur** qui pilote, pas la largeur : la rosace doit pouvoir
+   rendre de la place quand l'écran est bas, pour que les deux cartes restent
+   visibles. Le viewBox garde les proportions, la largeur suit. Le plancher est
+   le seuil sous lequel les noms de tactiques cessent d'être lisibles. */
+.rosace {
+    display: block;
+    margin: 0 auto;
+    height: clamp(190px, 34vh, 370px);
+    width: auto;
+    max-width: 100%;
+    overflow: visible;
+}
 
 /* La toile a son propre ton, `--toile` : les couleurs de bordure sont bien trop
    discrètes ici. Les polygones de repère portent plus d'information que les
@@ -210,15 +241,6 @@
     letter-spacing: 0.08em;
 }
 
-.rosace-figure figcaption {
-    margin-top: 12px;
-    font-size: 0.7rem;
-    line-height: 1.5;
-    color: var(--text-mute);
-    text-align: center;
-}
-.rosace-figure figcaption b { color: var(--text-dim); }
-
 /* Un fond qui défile et une rosace qui se dessine n'ont rien d'indispensable. */
 @media (prefers-reduced-motion: reduce) {
     .bd-band { animation: none; }
@@ -227,21 +249,13 @@
     .ros-dot { animation: none; opacity: 1; }
 }
 
-@media (max-width: 860px) {
-    .home-hero { grid-template-columns: 1fr; gap: 32px; justify-items: center; text-align: center; }
-    .home-lead { margin: 0 auto; }
-    /* La rosace ne rétrécit pas en dessous du seuil de lisibilité de ses
-       libellés : elle prend au contraire toute la largeur disponible. */
-    .rosace-figure { width: min(340px, 100%); }
-}
-
 /* Sur un écran étroit, le contenu occupe toute la largeur : le masque prévu pour
-   un titre en colonne de gauche recouvrait alors presque tout, et le fond
-   disparaissait. On resserre l'échancrure sur le seul bloc de texte du haut —
-   plus bas, les cartes sont opaques, elles se protègent d'elles-mêmes. */
+   un bloc centré recouvrait alors presque tout, et le fond disparaissait. On
+   resserre l'échancrure sur le seul bloc de texte du haut — plus bas, les cartes
+   sont opaques, elles se protègent d'elles-mêmes. */
 @media (max-width: 700px) {
     .home-backdrop {
-        mask-image: radial-gradient(ellipse 92% 24% at 50% 15%,
+        mask-image: radial-gradient(ellipse 92% 24% at 50% 14%,
             transparent 0%, rgba(0, 0, 0, 0.3) 52%, #000 86%);
         /* L'échancrure resserrée expose beaucoup plus de trame qu'en colonne :
            à intensité égale la page devenait bariolée. */
@@ -249,14 +263,17 @@
     }
 }
 
+/* Deux cartes empilées ne tiennent pas dans un écran de téléphone avec le titre
+   et la rosace au-dessus. Plutôt que de tout comprimer jusqu'à l'illisible, on
+   rend la hauteur libre : le défilement redevient normal, et c'est la rosace qui
+   part la première puisqu'elle n'est qu'un exemple. */
+@media (max-width: 700px), (max-height: 620px) {
+    .home-first { min-height: 0; gap: 24px; }
+}
+
 @media (max-width: 560px) {
     .home-inner { padding: 32px 16px 44px; }
-    .rosace-figure { width: 100%; }
-    /* Une pilule qui passe à la ligne n'en est plus une : sur trois lignes, avec
-       le crénage des majuscules espacées, elle était illisible. On garde la
-       version, on lâche la mention de relecture — le tuto la portera. */
-    .home-eyebrow { font-size: 0.63rem; padding: 4px 10px; }
-    .home-eyebrow .eb-long { display: none; }
+    .rosace { height: clamp(180px, 30vh, 260px); }
     .step { padding: 14px 15px 15px; }
     .home-foot { margin-top: 26px; }
 }
@@ -267,9 +284,12 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
     gap: 16px;
-    margin-bottom: 34px;
 }
 
+/* Les deux cartes sont traitées à égalité.
+   L'une portait la couleur d'accent en bordure et en fond, l'autre non : mis
+   côte à côte, cela se lisait comme un choix déjà fait plutôt que comme deux
+   chemins ouverts. C'est le bouton qui porte l'accent, pas la carte. */
 .action-card {
     display: flex;
     flex-direction: column;
@@ -279,12 +299,12 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+    transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .action-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
-.action-card.primary { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-wash), transparent 70%), var(--surface); }
 
-.action-card .glyph { font-size: 1.5rem; line-height: 1; }
+.action-card .glyph { display: block; color: var(--accent); }
+.action-card .glyph svg { display: block; width: 26px; height: 26px; }
 .action-card h2 { margin: 0; font-size: 1.02rem; font-weight: 650; letter-spacing: -0.01em; }
 .action-card p { margin: 0; font-size: 0.8rem; line-height: 1.55; color: var(--text-dim); flex: 1 1 auto; }
 .action-card .btn { align-self: flex-start; margin-top: 4px; }
@@ -303,97 +323,108 @@
 .drop-zone b { color: var(--text); font-weight: 600; }
 .drop-zone.hover b { color: var(--accent); }
 
-/* -------------------------------------------------------------- chiffres */
+/* -------------------------------------------------------------- chiffres
 
-.home-stats {
+   Trois chiffres, sans boîte.
+   Ils vivaient dans une grille cloisonnée de bordures, juste au-dessus de trois
+   cartes elles aussi encadrées : quatre rectangles empilés sur deux rangs, et
+   l'accueil finissait en tableur. Le chiffre est déjà une forme forte, il n'a
+   pas besoin d'un cadre pour se voir. Une seule ligne de séparation tient
+   l'ensemble. */
+
+.home-figures {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 18px 32px;
+    margin: clamp(40px, 7vh, 76px) 0 0;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
 }
-.stat {
-    background: var(--surface);
-    padding: 15px 16px;
+.figure { display: flex; flex-direction: column; gap: 2px; }
+.figure .v {
+    font-size: clamp(1.7rem, 3.6vw, 2.3rem);
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
 }
-.stat .v { font-size: 1.3rem; font-weight: 650; letter-spacing: -0.02em; display: block; }
-.stat .k { font-size: 0.68rem; color: var(--text-mute); line-height: 1.35; display: block; margin-top: 3px; }
+.figure .k {
+    font-size: 0.7rem;
+    color: var(--text-mute);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
 
-/* Trois chiffres dans deux colonnes laissent une case vide en bas à droite :
-   `auto-fit` sait replier une colonne entière, pas boucher un trou de fin de
-   ligne. Le dernier prend donc la largeur restante. Le sélecteur ne s'applique
-   que si le compte est impair, pour rester juste si un quatrième chiffre
-   revient. */
 @media (max-width: 560px) {
-    .home-stats { grid-template-columns: repeat(2, 1fr); }
-    .home-stats .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
-    /* La case pleine largeur garderait son texte collé à gauche, seule sur sa
-       ligne : on centre les trois pour que la grille se tienne. */
-    .stat { text-align: center; }
+    .home-figures { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .figure .k { font-size: 0.6rem; letter-spacing: 0.03em; }
 }
 
 /* ------------------------------------------- questionnaire, matrice, export
 
-   Les trois temps du parcours, dans l'ordre. Une flèche entre les cases dit le
-   sens de lecture ; elle disparaît quand les cases s'empilent. */
+   Les trois temps du parcours, dans l'ordre.
+
+   Plus de cadre autour de chacun : trois rectangles bordés sous trois autres
+   rectangles bordés, c'était la répétition qui rendait la page raide. Le
+   parcours est porté par un filet horizontal qui traverse les trois numéros —
+   il dit la suite mieux qu'une flèche glissée entre deux boîtes, et il tient
+   sur une ligne quand l'écran est large comme quand il ne l'est pas. */
 
 .home-steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    gap: 10px 34px;
     list-style: none;
-    margin: 0;
+    margin: clamp(30px, 5vh, 52px) 0 0;
     padding: 0;
-    counter-reset: none;
 }
 
-.step {
-    position: relative;
-    padding: 17px 18px 18px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-}
-.step + .step::before {
-    content: "→";
+.step { position: relative; padding-top: 34px; }
+
+/* Le filet part du numéro et file vers le suivant. Le dernier n'en a pas :
+   la ligne s'arrête où le parcours s'arrête. */
+.step:not(:last-child)::after {
+    content: "";
     position: absolute;
-    left: -12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.8rem;
-    color: var(--text-mute);
-    line-height: 1;
+    top: 12px;
+    left: 32px;
+    right: -34px;
+    height: 1px;
+    background: var(--border);
 }
 
 .step-num {
+    position: absolute;
+    top: 0;
+    left: 0;
     display: inline-grid;
     place-items: center;
-    width: 21px;
-    height: 21px;
+    width: 25px;
+    height: 25px;
     border-radius: 50%;
-    background: var(--accent-wash);
+    background: var(--bg);
     border: 1px solid var(--accent);
     color: var(--accent);
-    font-size: 0.68rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    margin-bottom: 10px;
 }
 
-.step h3 { margin: 0 0 6px; font-size: 0.85rem; font-weight: 650; }
-.step p { margin: 0; font-size: 0.75rem; line-height: 1.55; color: var(--text-dim); }
+.step h3 { margin: 0 0 6px; font-size: 0.88rem; font-weight: 650; }
+.step p { margin: 0; font-size: 0.78rem; line-height: 1.6; color: var(--text-dim); }
 
 @media (max-width: 700px) {
-    .home-steps { grid-template-columns: 1fr; }
-    .step + .step::before { content: none; }
-
-    /* Empilées, les trois cases feraient défiler pour rien si le numéro gardait
-       sa ligne : il passe à gauche du titre, le texte se cale dessous. */
-    .step { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
-    .step-num { grid-row: span 2; align-self: start; margin-bottom: 0; }
-    .step h3 { margin: 0; }
+    .home-steps { grid-template-columns: 1fr; gap: 22px; }
+    /* Empilés, les numéros s'alignent verticalement : le filet suit, à la
+       verticale, et relie chaque étape à la suivante. */
+    .step { padding: 0 0 0 40px; min-height: 25px; }
+    .step:not(:last-child)::after {
+        top: 30px;
+        bottom: -22px;
+        left: 12px;
+        right: auto;
+        width: 1px;
+        height: auto;
+    }
 }
 
 .home-secondary { text-align: center; margin-top: 26px; }

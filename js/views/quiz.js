@@ -9,11 +9,17 @@
    nombre de mitigations du catalogue.
    ========================================================================= */
 
-import { esc, $, toast } from "../ui.js";
+import { esc, $, toast, openModal, closeModal } from "../ui.js";
 import { QUESTIONNAIRES, LEVEL_LABELS, getQuestionnaire } from "../catalog.js";
 import { resolvedEntries, sharedText, sharedWith, answeredElsewhere } from "../shared-questions.js";
+import { needsTool } from "../tool-questions.js";
 import { mitigationLevel } from "../scoring.js";
 import { setAnswer, progress, questionnaireState, nextTarget, reviewTarget, acquiredMitigations } from "../layer.js";
+
+const GLYPH_ASK = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="ico">
+    <path d="M3.5 6.5h17v11h-17z" stroke="currentColor" stroke-width="1.5"/>
+    <path d="m3.5 7 8.5 6 8.5-6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>`;
 
 /**
  * Position courante dans le questionnaire.
@@ -184,12 +190,14 @@ function paint(app) {
     const entry = entries[question.num];
     const answered = entry?.value ?? null;
     const pct = Math.round((cursor.index / total) * 100);
-    const global = progress(layer);
     // Reculer n'a de sens que s'il reste une question posable en amont : toutes
     // celles qui précèdent peuvent avoir été franchies.
     const peutReculer = questionnaire.questions
         .slice(0, cursor.index)
         .some(q => !answeredElsewhere(layer, cursor.mitigation, q.num));
+
+    const texte = sharedText(questionnaire.id, question.num) ?? question.text;
+    const avecOutil = needsTool(questionnaire.id, question);
 
     $("#view-quiz").innerHTML = `
         <div class="quiz-inner">
@@ -197,28 +205,21 @@ function paint(app) {
                 <div class="quiz-tag">${esc(questionnaire.id)}</div>
                 <h2 class="quiz-title">${esc(questionnaire.name)}</h2>
                 <p class="quiz-desc">${esc(questionnaire.description)}</p>
-                ${contributionNotice(app.layer, questionnaire)}
             </div>
 
             <div class="level-track">${levelTrack(level ?? 0, question.level)}</div>
-            <p class="track-caption">
-                Niveaux acquis en plein · cerclé : le niveau que vise la question affichée
-            </p>
 
             <div class="quiz-progress">
-                <div class="quiz-progress-label">
-                    Question ${cursor.index + 1} / ${total}
-                    · ${global.completeMitigations}/${global.mitigations} mitigation${global.mitigations > 1 ? "s" : ""} traitée${global.completeMitigations > 1 ? "s" : ""}
-                </div>
                 <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
             </div>
 
-            <div class="quiz-card level-${question.level}">
-                <div class="quiz-card-level">
-                    Niveau visé : <b>${question.level} — ${esc(LEVEL_LABELS[question.level])}</b>
-                </div>
-                <p class="quiz-question">${esc(sharedText(questionnaire.id, question.num) ?? question.text)}</p>
-                ${sharedNotice(questionnaire.id, question.num)}
+            <!-- Le rang de la question n'est plus écrit à l'écran — deux
+                 échelles chiffrées au-dessus de la barre disaient ce qu'elle
+                 montre déjà. Il reste porté ici, pour le banc d'essai et pour
+                 qui inspecte la page. -->
+            <div class="quiz-card level-${question.level}"
+                 data-question="${cursor.index + 1}" data-total="${total}">
+                <p class="quiz-question">${esc(texte)}</p>
 
                 <div class="quiz-answers">
                     <button class="quiz-answer yes ${answered === "Oui" ? "selected" : ""}" data-answer="Oui">Oui</button>
@@ -226,19 +227,20 @@ function paint(app) {
                     <button class="quiz-answer na ${answered === "N/A" ? "selected" : ""}" data-answer="N/A">N/A</button>
                 </div>
 
-                <div class="quiz-tool">
-                    <label for="q-tool">Outil en place, si applicable</label>
-                    <input type="text" id="q-tool" value="${esc(entry?.tool || "")}"
-                           placeholder="ex : Entra ID, Duo, PingID…" autocomplete="off">
-                    <span class="help">Repris dans la fiche de la mitigation, dans le récapitulatif
-                        de fin de questionnaire et dans l'export (colonne « Outil »).</span>
-                </div>
+                ${avecOutil ? `
+                    <div class="quiz-tool">
+                        <label for="q-tool">Outil en place, si applicable</label>
+                        <input type="text" id="q-tool" value="${esc(entry?.tool || "")}"
+                               placeholder="ex : Entra ID, Duo, PingID…" autocomplete="off">
+                    </div>` : ""}
 
-                <div class="quiz-refs">Réf. ${esc(question.references)}</div>
+                <button class="btn btn-ghost btn-sm quiz-ask" id="q-ask">
+                    ${GLYPH_ASK} Faire suivre cette question
+                </button>
             </div>
 
             <div class="quiz-nav">
-                <button class="btn btn-ghost" id="q-back" ${peutReculer ? "" : "disabled"}>← Précédent</button>
+                ${peutReculer ? `<button class="btn btn-ghost" id="q-back">← Précédent</button>` : ""}
                 <span class="grow"></span>
                 ${answered ? `<button class="btn btn-sm" id="q-next">Suivant →</button>` : ""}
                 <button class="btn btn-sm" id="q-matrix">Voir la matrice</button>
@@ -250,42 +252,87 @@ function paint(app) {
     }
     // On enregistre l'outil dès la frappe : sinon quitter la question par un
     // clic sur « Oui » perdrait la saisie en cours.
-    $("#q-tool").oninput = e => {
+    const tool = $("#q-tool");
+    if (tool) tool.oninput = e => {
         setAnswer(app.layer, cursor.mitigation, question.num, { tool: e.target.value.trim() });
     };
-    $("#q-back").onclick = () => { if (stepBack(app)) paint(app); };
+    const back = $("#q-back");                 // absent sur la première question posable
+    if (back) back.onclick = () => { if (stepBack(app)) paint(app); };
     const next = $("#q-next");                 // rendu seulement si la question a une réponse
     if (next) next.onclick = () => advance(app);
+    $("#q-ask").onclick = () => askSomeone(questionnaire, question, texte);
     $("#q-matrix").onclick = () => app.show("matrix");
 }
 
-/** Signale qu'une question est commune à d'autres mitigations. */
-function sharedNotice(mitigationId, num) {
-    const others = sharedWith(mitigationId, num);
-    if (!others.length) return "";
+/* ------------------------------------------------- faire suivre une question
 
-    return `<p class="quiz-shared">
-        <span class="quiz-shared-icon" aria-hidden="true">⇄</span>
-        Même question que ${others.map(id => `<b>${esc(id)}</b>`).join(" et ")}
-    </p>`;
+   Personne ne connaît les quarante-trois sujets. Plutôt que de laisser deviner
+   ou répondre à peu près, on prépare le message à envoyer à qui saura : le
+   contexte de la mitigation, la question mot pour mot, et ce que valent les
+   trois réponses.
+
+   Rien n'est envoyé d'ici — le site ne parle à aucun service. On copie, ou on
+   ouvre son propre client de messagerie. */
+
+function askTemplate(questionnaire, question, texte) {
+    return [
+        `Bonjour,`,
+        ``,
+        `Nous évaluons la maturité cyber de l'organisation sur le référentiel MITRE ATT&CK.`,
+        `Une question relève de ton périmètre, sur « ${questionnaire.id} — ${questionnaire.name} ».`,
+        ``,
+        `Question : ${texte}`,
+        ``,
+        `Réponses possibles :`,
+        `  • Oui — la pratique est en place ;`,
+        `  • Non — elle ne l'est pas, ou pas encore ;`,
+        `  • N/A — elle ne s'applique pas à notre contexte.`,
+        ``,
+        `Un mot de contexte ou le nom de l'outil concerné nous serait utile.`,
+        ``,
+        `Merci d'avance,`,
+    ].join("\n");
 }
 
-/**
- * Signale qu'une note dépend aussi d'une question posée dans une autre
- * mitigation, et où en est cette réponse.
- */
-function contributionNotice(layer, questionnaire) {
-    if (!questionnaire.contributions?.length) return "";
+function askSomeone(questionnaire, question, texte) {
+    const corps = askTemplate(questionnaire, question, texte);
+    const sujet = `Maturité cyber — ${questionnaire.id} question ${question.num}`;
 
-    const parts = questionnaire.contributions.map(({ from, question, weight }) => {
-        const value = resolvedEntries(layer, from)[question]?.value;
-        const effect = value === "Oui" ? `+${weight}`
-            : value === "Non" ? `−${weight}`
-                : value ? "sans effet" : "pas encore répondue";
-        return `<b>${esc(from)}</b> question ${question} (±${weight}) — ${esc(effect)}`;
-    });
+    const panel = openModal(`
+        <div class="modal-head">
+            <h3 style="margin:0;font-size:1.02rem;">Faire suivre cette question</h3>
+            <p style="margin:6px 0 0;font-size:0.76rem;color:var(--text-dim);line-height:1.5;">
+                À envoyer à la personne dont c'est le sujet. Rien ne part d'ici : le message est
+                à copier, ou à ouvrir dans votre messagerie.
+            </p>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label for="ask-body">Message</label>
+                <textarea id="ask-body" rows="14" spellcheck="false">${esc(corps)}</textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn" id="ask-copy">Copier</button>
+                <a class="btn btn-primary" id="ask-mail"
+                   href="mailto:?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}">
+                   Ouvrir dans ma messagerie</a>
+            </div>
+        </div>`);
 
-    return `<p class="quiz-link">Cette note dépend aussi de : ${parts.join(" · ")}</p>`;
+    panel.querySelector("#ask-copy").onclick = async () => {
+        const texteAEnvoyer = panel.querySelector("#ask-body").value;
+        try {
+            await navigator.clipboard.writeText(texteAEnvoyer);
+            toast("Message copié.");
+        } catch {
+            // Le presse-papiers est refusé hors contexte sécurisé, et sur
+            // certains postes d'entreprise. La sélection laisse alors la main.
+            panel.querySelector("#ask-body").select();
+            toast("Copie refusée par le navigateur — le texte est sélectionné.", "error");
+        }
+    };
+    panel.querySelector("#ask-mail").onclick = () => closeModal();
+    panel.querySelector(".modal-close").onclick = () => closeModal();
 }
 
 /**
@@ -424,10 +471,6 @@ function paintResult(app, questionnaire, level) {
         .map(q => ({ num: q.num, tool: entries[q.num]?.tool }))
         .filter(x => x.tool);
 
-    // Le cadrage demande un aperçu de la matrice tous les cinq questionnaires
-    // terminés, pour entretenir la motivation sur un parcours long.
-    const milestone = global.completeMitigations > 0 && global.completeMitigations % 5 === 0;
-
     // Le décompte des questions non reposées : sans lui, « 8 questions
     // répondues » après en avoir vu cinq à l'écran ressemble à une erreur.
     const skipped = skippedCount(app, questionnaire);
@@ -451,7 +494,6 @@ function paintResult(app, questionnaire, level) {
                         ? " — le parcours s'est arrêté sur un « Non »" : ""}
                     ${skipped ? `· ${skipped} déjà répondue${skipped > 1 ? "s" : ""} depuis une autre mitigation` : ""}
                     · ${global.completeMitigations}/${global.mitigations} mitigation${global.mitigations > 1 ? "s" : ""} traitée${global.completeMitigations > 1 ? "s" : ""}
-                    ${milestone ? "<br>Bon moment pour aller voir la matrice se remplir." : ""}
                 </p>
 
                 ${tools.length ? `
@@ -476,8 +518,50 @@ function paintResult(app, questionnaire, level) {
 
     const nextButton = $("#r-next");
     if (nextButton) nextButton.onclick = () => {
-        goTo(target.mitigation, indexOfQuestion(target.mitigation, target.question));
-        paint(app);
-        toast(`Mitigation ${target.mitigation}`);
+        // Toutes les cinq mitigations, on marque un temps d'arrêt avant
+        // d'enchaîner. Sur quarante-trois, le parcours devient une chaîne qu'on
+        // déroule sans plus regarder ce qu'elle produit ; la pause redonne la
+        // main et rappelle qu'une matrice se remplit derrière.
+        if (global.completeMitigations > 0 && global.completeMitigations % 5 === 0) {
+            paintPause(app, global, target);
+            return;
+        }
+        goToTarget(app, target);
     };
+}
+
+/** Ouvre la mitigation suivante à traiter. */
+function goToTarget(app, target) {
+    goTo(target.mitigation, indexOfQuestion(target.mitigation, target.question));
+    paint(app);
+    toast(`Mitigation ${target.mitigation}`);
+}
+
+/**
+ * La pause, dans l'esprit du « vous regardez toujours ? ».
+ *
+ * Deux propositions, pas une de plus : reprendre, ou aller voir la matrice.
+ * Toute option supplémentaire ferait de cet écran une décision à prendre, alors
+ * qu'il est là pour souffler.
+ */
+function paintPause(app, global, target) {
+    $("#view-quiz").innerHTML = `
+        <div class="quiz-inner">
+            <div class="quiz-pause">
+                <svg class="pause-mascot" viewBox="0 0 64 64" aria-hidden="true"><use href="#mascot"/></svg>
+                <h2 class="quiz-title">Toujours là ?</h2>
+                <p class="result-text">
+                    ${global.completeMitigations} mitigations sur ${global.mitigations} sont traitées.
+                    La matrice s'est colorée d'autant — c'est le moment d'aller voir, ou de continuer
+                    sur votre lancée.
+                </p>
+                <div class="pause-actions">
+                    <button class="btn btn-lg" id="p-matrix">Voir la matrice</button>
+                    <button class="btn btn-primary btn-lg" id="p-continue">Continuer →</button>
+                </div>
+            </div>
+        </div>`;
+
+    $("#p-matrix").onclick = () => app.show("matrix");
+    $("#p-continue").onclick = () => goToTarget(app, target);
 }

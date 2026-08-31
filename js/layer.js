@@ -263,7 +263,8 @@ export function toJSON(layer) {
 export function fromJSON(text) {
     const raw = JSON.parse(text);
     if (raw.schema !== SCHEMA) {
-        throw new Error(`Format de layer inconnu (« ${raw.schema ?? "non renseigné"} »).`);
+        console.warn(`Import : schéma de layer inconnu (« ${raw.schema ?? "non renseigné"} »).`);
+        throw new Error("format non pris en charge");
     }
     return hydrate(raw);
 }

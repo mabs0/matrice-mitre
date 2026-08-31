@@ -236,7 +236,6 @@ label { font-size: 0.74rem; color: var(--text-dim); }
     color: var(--text-dim);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--warn);
     border-radius: var(--radius-sm);
     padding: 14px 16px;
 }

@@ -84,23 +84,35 @@
         --accent-ink: #ffffff;
         --accent-wash: rgba(42, 120, 214, 0.10);
 
-        /* Sur surface claire l'ordre s'inverse : plus mature = plus foncé.
-           Clarté monotone, écart minimal 0,072, encre à 4,64:1 au pire.
+        /* Sur surface claire, c'est un feu tricolore, pas un dégradé.
 
-           Le niveau 2 est un ambre franc (teinte 70°) et non un jaune sombre :
-           à cette clarté, le jaune tire à l'olive et salit la surface claire.
-           Le niveau 3 est très légèrement assombri pour rétablir l'écart, qui
-           n'était que de 0,053 — sous le seuil de perception fiable. */
-        --lvl0: #fea195;
-        --lvl0-ink: #0b0b0b;
-        --lvl1: #ef852e;
+           La rampe précédente ordonnait les paliers par la clarté — plus mature,
+           plus foncé. Elle était juste sur le papier et fausse à l'usage : le
+           niveau 0 y était un rose pâle, qui ne se lit pas comme un danger. Une
+           matrice se parcourt d'un coup d'œil pour trouver où ça va mal ; c'est
+           la teinte qui doit le dire, et le rouge doit peser.
+
+           On reprend donc la rampe de référence du projet — rouge, orange,
+           jaune, vert clair, vert —, le rouge adouci pour qu'il alerte sans
+           crier. La clarté n'y est pas monotone : le jaune est le palier le plus
+           clair et le vert redescend. Ce n'est pas un défaut, c'est la
+           convention du feu tricolore, que tout le monde lit sans apprentissage.
+
+           Ce qui est garanti à la place, et mesuré par le banc : deux paliers ne
+           se confondent jamais (distance OKLab ≥ 0,12 sur toutes les paires, pas
+           seulement les voisines) et l'encre reste lisible partout (4,89:1 au
+           pire). Chaque case imprime son niveau : la couleur ne porte jamais
+           l'information seule. */
+        --lvl0: #ce3b31;
+        --lvl0-ink: #ffffff;
+        --lvl1: #ef8a2f;
         --lvl1-ink: #0b0b0b;
-        --lvl2: #c27b00;
+        --lvl2: #f1ed83;
         --lvl2-ink: #0b0b0b;
-        --lvl3: #53890c;
+        --lvl3: #a5d861;
         --lvl3-ink: #0b0b0b;
-        --lvl4: #067138;
-        --lvl4-ink: #ffffff;
+        --lvl4: #0f9a3c;
+        --lvl4-ink: #0b0b0b;
 
         --nomit-ink: #a8a6a0;
         --nomit-hatch: rgba(11, 11, 11, 0.04);
@@ -130,18 +142,18 @@
     --accent-ink: #ffffff;
     --accent-wash: rgba(42, 120, 214, 0.10);
 
-    /* Même rampe claire que ci-dessus : ambre au niveau 2, vert légèrement
-       assombri au niveau 3. Clarté monotone, écart minimal 0,072. */
-    --lvl0: #fea195;
-    --lvl0-ink: #0b0b0b;
-    --lvl1: #ef852e;
+    /* Même rampe claire que ci-dessus — feu tricolore, rouge adouci. Les deux
+       déclarations doivent rester identiques : le banc les compare. */
+    --lvl0: #ce3b31;
+    --lvl0-ink: #ffffff;
+    --lvl1: #ef8a2f;
     --lvl1-ink: #0b0b0b;
-    --lvl2: #c27b00;
+    --lvl2: #f1ed83;
     --lvl2-ink: #0b0b0b;
-    --lvl3: #53890c;
+    --lvl3: #a5d861;
     --lvl3-ink: #0b0b0b;
-    --lvl4: #067138;
-    --lvl4-ink: #ffffff;
+    --lvl4: #0f9a3c;
+    --lvl4-ink: #0b0b0b;
 
     --nomit-ink: #a8a6a0;
     --nomit-hatch: rgba(11, 11, 11, 0.04);

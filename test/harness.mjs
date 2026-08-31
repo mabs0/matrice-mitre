@@ -172,14 +172,14 @@ const home = window.document.getElementById("view-home");
 ok("accueil visible", !home.classList.contains("hidden"));
 ok("bouton « Créer un layer » présent", !!window.document.getElementById("home-new"));
 ok("zone d'import présente", !!window.document.getElementById("home-drop"));
-const stats = [...home.querySelectorAll(".stat .v")].map(n => n.textContent);
+const stats = [...home.querySelectorAll(".figure .v")].map(n => n.textContent);
 // T9999 n'a aucune relation ; T1555 en a une, mais vers T1555.001 qui n'existe
 // pas dans ce mini-bundle — elle doit être ignorée, donc deux techniques
 // se retrouvent sans mitigation.
 ok("chiffres calculés", stats.join("/") === "7/4/1", `mitigations/techniques/sous-techniques = ${stats.join("/")}`);
 ok("l'accueil ne montre plus les tactiques ni les techniques sans mitigation",
    stats.length === 3 &&
-   !window.document.getElementById("view-home").querySelector(".home-stats")
+   !window.document.getElementById("view-home").querySelector(".home-figures")
        .textContent.match(/tactique|sans mitigation/i));
 ok("relation vers une cible inexistante ignorée",
    window.document.getElementById("view-home").textContent.includes("2"));
@@ -234,20 +234,33 @@ const openMitigation = () => window.document.querySelector(".quiz-tag")?.textCon
 ok("on démarre sur la première mitigation du catalogue",
    openMitigation() === [...QST.keys()][0], openMitigation());
 
-/** Répond « Oui » partout et enchaîne les mitigations. */
-function answerAllYes(limit = totalQuestions() + QST.size + 10) {
+/** Répond « Oui » partout et enchaîne les mitigations, pauses comprises. */
+function answerAllYes(limit = totalQuestions() + QST.size + 30) {
     const visited = [];
+    const pauses = [];
     for (let i = 0; i < limit; i++) {
         const tag = openMitigation();
         const yes = window.document.querySelector('[data-answer="Oui"]');
         if (yes) { if (!visited.includes(tag)) visited.push(tag); yes.click(); continue; }
         const next = window.document.getElementById("r-next");
         if (next) { next.click(); continue; }
+        // Toutes les cinq mitigations, un écran de pause s'intercale entre le
+        // résultat et la mitigation suivante.
+        const carryOn = window.document.getElementById("p-continue");
+        if (carryOn) { pauses.push(visited.length); carryOn.click(); continue; }
         break;
     }
-    return visited;
+    return { visited, pauses };
 }
-const visited = answerAllYes();
+const { visited, pauses } = answerAllYes();
+
+/* La pause, dans l'esprit du « vous regardez toujours ? » : sur quarante-trois
+   mitigations, le parcours devient une chaîne qu'on déroule sans plus regarder
+   ce qu'elle produit. Deux propositions, pas une de plus — l'écran est là pour
+   souffler, pas pour poser une décision de plus. */
+ok("une pause s'intercale toutes les cinq mitigations",
+   pauses.length === Math.floor(QST.size / 5) && pauses.every(n => n % 5 === 0),
+   `pauses après ${pauses.join(", ")} mitigations`);
 ok(`les ${QST.size} mitigations évaluables ont été parcourues`, visited.length === QST.size,
    `${visited.length} visitées`);
 ok("dans l'ordre du catalogue, sans passer par celle sans questionnaire",
@@ -421,8 +434,12 @@ foreign.addWorksheet("M1032").addRow(["Numéro", "Question"]);
 let refusal = null;
 try { readWorkbook(foreign, { name: "Étranger" }); } catch (err) { refusal = err.message; }
 ok("un classeur étranger est refusé", refusal !== null, refusal);
-ok("et le message dit ce qui est attendu",
-   /Réponses/.test(refusal ?? "") && /exporté par cet outil/.test(refusal ?? ""), refusal);
+// Le message affiché reste court. « Feuille "Réponses" absente. Attendu : un
+// classeur exporté par cet outil. » décrivait la structure interne du fichier
+// produit — sans intérêt pour qui vient de déposer le mauvais document, et
+// intimidant. Le détail part en console, où il sert à diagnostiquer.
+ok("et le message reste lisible par qui n'a pas ouvert le classeur",
+   refusal === "format non pris en charge", refusal);
 
 // Une feuille « Réponses » présente mais vide de réponses exploitables.
 const emptySheet = new ExcelJS.Workbook();
@@ -431,8 +448,11 @@ vide.addRow(["Mitigation", "Numéro", "Réponse"]);
 vide.addRow(["M1032", 1, "Peut-être"]);
 let emptyError = null;
 try { readWorkbook(emptySheet, { name: "Vide" }); } catch (err) { emptyError = err.message; }
-ok("une feuille « Réponses » sans réponse valable est signalée",
-   /aucune réponse exploitable/.test(emptyError ?? ""), emptyError);
+// Distinct du cas précédent : le fichier est bien du bon format, il n'y a
+// simplement rien à reprendre. Dire « format non pris en charge » enverrait
+// chercher un autre fichier alors que c'est le bon.
+ok("une feuille « Réponses » sans réponse valable se distingue d'un format refusé",
+   emptyError === "aucune réponse à reprendre dans ce fichier", emptyError);
 
 /* ------------------------------------------------------ JSON chiffré */
 
@@ -554,8 +574,8 @@ const toasts = [...window.document.querySelectorAll(".toast")].map(t => t.textCo
 ok("import sans message d'erreur", !toasts.some(t => t.includes("impossible")), toasts.join(" | "));
 ok("le questionnaire reprend sur M1032 à la question 2",
    window.document.querySelector(".quiz-tag")?.textContent.trim() === "M1032" &&
-   window.document.querySelector(".quiz-progress-label")?.textContent.includes("Question 2"),
-   window.document.querySelector(".quiz-progress-label")?.textContent.trim().split("\n")[0]);
+   window.document.querySelector(".quiz-card")?.dataset.question === "2",
+   window.document.querySelector(".quiz-card")?.dataset.question);
 
 const matrixButton = window.document.getElementById("q-matrix");
 ok("« Voir la matrice » est bien câblé avant toute réponse", typeof matrixButton?.onclick === "function");
@@ -570,7 +590,7 @@ const currentLevelOf = () => {
     const dot = window.document.querySelector(".level-dot.current");
     return dot ? Number(dot.textContent.trim()) : null;
 };
-const questionLabel = () => window.document.querySelector(".quiz-progress-label").textContent.match(/Question (\d+)/)[1];
+const questionLabel = () => window.document.querySelector(".quiz-card").dataset.question;
 ok("on est sur la question 2 (niveau visé 2)", questionLabel() === "2" && currentLevelOf() === 2,
    `Q${questionLabel()} niveau ${currentLevelOf()}`);
 window.document.getElementById("q-back").click();
@@ -842,8 +862,13 @@ window.document.querySelector('[data-tech="T1078"]').click();
 [...window.document.querySelectorAll("#modal-panel [data-edit]")]
     .find(b => b.dataset.edit === "M1016").click();
 ok("le questionnaire s'est ouvert sur M1016", openMitigation() === "M1016", openMitigation());
-ok("le questionnaire signale la dépendance",
-   /M1049/.test(window.document.querySelector(".quiz-link")?.textContent ?? ""),
+// La dépendance n'est plus annoncée sur la question. « Cette note dépend aussi
+// de M1049 question 5 (±0.25) — pas encore répondue » décrivait la mécanique de
+// notation à quelqu'un qui a seulement une question à trancher, et le poids
+// affiché n'aidait à rien puisqu'il ne se pilote pas. Elle continue d'agir sur
+// la note : c'est ce que vérifie la suite de ce groupe.
+ok("la dépendance n'encombre plus la question",
+   !window.document.querySelector(".quiz-link"),
    window.document.querySelector(".quiz-link")?.textContent.trim());
 
 /* ------------------------------------------------ passe de relecture */
@@ -895,35 +920,41 @@ ok("tout acquis : l'écran « Rien à revoir » s'affiche",
    /Rien à revoir/.test(window.document.getElementById("view-quiz").textContent),
    window.document.querySelector(".quiz-title")?.textContent);
 
-/* --------------------------------- atténuation des sous-techniques */
+/* --------------------------------- ce que la barre d'outils garde */
 
-console.log("\n[23] Surlignage d'une mitigation et sous-techniques");
+console.log("\n[23] Barre d'outils de la matrice, et resserrement");
 window.document.getElementById("r-matrix").click();
 window.document.getElementById("matrix-subs").checked = true;
 window.document.getElementById("matrix-subs").dispatchEvent(new window.Event("change"));
 ok("les sous-techniques sont dépliées", !!window.document.querySelector('[data-tech="T1078.001"]'));
 
-const select = window.document.getElementById("matrix-mitigation");
-select.value = "M1032";
-select.dispatchEvent(new window.Event("change"));
+// « Surligner une mitigation » éteignait toute la matrice pour n'en garder que
+// quelques cases : il fallait renoncer à la vue d'ensemble — la seule chose que
+// cet écran sache faire — pour suivre une mitigation qu'on lit mieux dans sa
+// propre fiche. Ce qui reste sert à cadrer la lecture, pas à la remplacer.
+ok("le surlignage d'une mitigation est retiré",
+   !window.document.getElementById("matrix-mitigation"));
+ok("la recherche, les plateformes, les sous-techniques et la notation restent",
+   ["matrix-search", "dd-platform", "matrix-subs", "dd-method"]
+       .every(id => !!window.document.getElementById(id)),
+   ["matrix-search", "dd-platform", "matrix-subs", "dd-method"]
+       .filter(id => !window.document.getElementById(id)).join(", ") || "toutes présentes");
+ok("plus aucune case n'est atténuée",
+   !window.document.querySelector(".cell.dimmed, .cell.highlighted"));
 
-const parent = window.document.querySelector('[data-tech="T1078"]');
-const sub = window.document.querySelector('[data-tech="T1078.001"]');
-ok("la technique couverte est surlignée", parent.classList.contains("highlighted"));
-ok("la sous-technique non couverte est atténuée", sub.classList.contains("dimmed"),
-   [...sub.classList].join(" "));
-ok("elle ne porte pas d'opacité concurrente", !/opacity/.test(sub.style.cssText));
-
-// La règle d'état doit être déclarée après la forme des cases.
+// Les zones de faiblesse doivent se voir d'un coup d'œil : quinze tactiques à
+// 146 px faisaient plus de deux largeurs d'écran, et la matrice se lisait par
+// fragments.
 const css = readFileSync(`${ROOT}/css/matrix.css`, "utf8");
-ok("« .cell.dimmed » est déclarée après « .cell.sub »",
-   css.indexOf(".cell.dimmed") > css.indexOf(".cell.sub"),
-   `sub à ${css.indexOf(".cell.sub")}, dimmed à ${css.indexOf(".cell.dimmed")}`);
-ok("« .cell.sub » ne fixe plus d'opacité",
+const colonne = Number(/minmax\((\d+)px/.exec(
+    readFileSync(`${ROOT}/js/views/matrix.js`, "utf8"))[1]);
+ok("les colonnes sont resserrées", colonne <= 120, `${colonne}px`);
+const tailleCase = Number(/\.cell\s*\{[^}]*font-size:\s*([\d.]+)rem/.exec(css)[1]);
+ok("et les cases avec elles", tailleCase <= 0.61, `${tailleCase}rem`);
+ok("les règles du surlignage sont retirées du CSS",
+   !/\.cell\.dimmed/.test(css) && !/\.cell\.highlighted/.test(css));
+ok("« .cell.sub » ne fixe pas d'opacité",
    !/\.cell\.sub\s*\{[^}]*opacity/.test(css));
-
-select.value = "";
-select.dispatchEvent(new window.Event("change"));
 
 /* --------------------------------------- questions communes à des mitigations */
 
@@ -1097,12 +1128,12 @@ ok("M1027 Q2 reste séparée de M1018 Q2", groupOf("M1027", 2) === null);
     [...window.document.querySelectorAll("#modal-panel [data-edit]")]
         .find(b => b.dataset.edit === "M1018").click();
     for (let i = 0; i < 4; i++) window.document.querySelector('[data-answer="Oui"]').click();
-    const notice = window.document.querySelector(".quiz-shared");
-    ok("le questionnaire signale la question commune", !!notice, notice?.textContent.trim());
-    ok("il nomme les autres mitigations concernées",
-       /M1026/.test(notice?.textContent ?? "") && /M1027/.test(notice?.textContent ?? ""));
-    ok("et affiche la formulation commune",
-       window.document.querySelector(".quiz-question")?.textContent.includes("ou sensibles"));
+    // Que la question soit commune ne se voit pas — voir [27]. Ce qui se voit,
+    // c'est la formulation retenue pour le groupe : c'est elle qui doit être
+    // posée, et non celle de la seule mitigation ouverte.
+    ok("la formulation commune est celle qui est posée",
+       window.document.querySelector(".quiz-question")?.textContent.includes("ou sensibles"),
+       window.document.querySelector(".quiz-question")?.textContent.trim().slice(0, 80));
 }
 
 console.log("\n[24b] Une question commune n'est jamais reposée");
@@ -1162,11 +1193,12 @@ console.log("\n[24b] Une question commune n'est jamais reposée");
 
     const vues = [];
     for (let i = 0; i < 6; i++) {
-        vues.push(window.document.querySelector(".quiz-progress-label")?.textContent.trim().split("·")[0].trim());
+        const carte = window.document.querySelector(".quiz-card");
+        vues.push(`${carte?.dataset.question}/${carte?.dataset.total}`);
         window.document.querySelector('[data-answer="Oui"]')?.click();
     }
     ok("les six premières questions sont posées normalement",
-       vues.join(" | ") === [1, 2, 3, 4, 5, 6].map(n => `Question ${n} / 14`).join(" | "),
+       vues.join(" | ") === [1, 2, 3, 4, 5, 6].map(n => `${n}/14`).join(" | "),
        vues.join(" | "));
 
     const resultat = window.document.querySelector(".quiz-result");
@@ -1242,8 +1274,15 @@ window.document.getElementById("brand").click();
     ok("la valeur centrale est la moyenne des sommets",
        home.querySelector(".ros-value")?.textContent === mean,
        `${home.querySelector(".ros-value")?.textContent} attendu ${mean}`);
-    ok("la rosace est légendée comme un exemple",
-       /Exemple/.test(home.querySelector(".rosace-figure figcaption")?.textContent ?? ""));
+    // La légende « Exemple — un rayon par tactique… » a été retirée : elle
+    // expliquait le dessin à un lecteur qui n'a encore rien saisi, et pesait
+    // sous une rosace désormais centrée. Le statut d'exemple reste porté par le
+    // `aria-label`, pour qui ne voit pas le dessin.
+    ok("plus de légende sous la rosace",
+       !home.querySelector(".rosace-figure figcaption"));
+    ok("mais le statut d'exemple reste annoncé à qui ne la voit pas",
+       /exemple/i.test(home.querySelector(".rosace")?.getAttribute("aria-label") ?? ""),
+       home.querySelector(".rosace")?.getAttribute("aria-label"));
 
     /* --- les axes sont nommés --- */
 
@@ -1362,7 +1401,7 @@ window.document.getElementById("brand").click();
     ok("la trame de cases n'existe qu'une fois",
        home.querySelectorAll("#bd-tiles").length === 1 &&
        home.querySelectorAll("defs #bd-tiles").length === 1);
-    ok("elle est reprise par des <use>", home.querySelectorAll(".bd-band use").length >= 6);
+    ok("elle est reprise par des <use>", home.querySelectorAll(".bd-band use").length >= 2);
 
     // Le défilement porte sur un élément HTML. Une transformation CSS animée à
     // l'intérieur d'un SVG n'est pas fiable dans WebKit — donc sur tout
@@ -1373,9 +1412,14 @@ window.document.getElementById("brand").click();
     ok("la trame est définie hors des bandes, dans un SVG qui n'est pas masqué",
        !!home.querySelector(".bd-defs defs #bd-tiles") &&
        !/display:\s*none/.test(home.querySelector(".bd-defs").getAttribute("style") ?? ""));
-    ok("les bandes défilent à des vitesses différentes",
-       new Set([...home.querySelectorAll(".bd-band")]
-           .map(b => b.style.getPropertyValue("--dur"))).size > 1);
+    // Une seule bande, et non plus trois à des vitesses différentes : les trois
+    // montraient la même découpe à trois hauteurs, et la répétition sautait aux
+    // yeux — la matrice se lisait comme un motif au lieu d'être reconnue.
+    ok("une seule bande défile", home.querySelectorAll(".bd-band").length === 1,
+       `${home.querySelectorAll(".bd-band").length} bande(s)`);
+    ok("et elle est assez grande pour qu'on lise les tactiques",
+       Number(/font-size:\s*([\d.]+)px/.exec(
+           /\.bd-head-text\s*\{[^}]*\}/.exec(homeCss)[0])[1]) >= 9);
 
     // L'amplitude du défilement doit valoir exactement une trame, sinon la
     // boucle saute. Le markup la porte, le CSS s'y réfère : pas de doublon.
@@ -1413,9 +1457,10 @@ window.document.getElementById("brand").click();
     ok("aucun trou dans le défilement, du téléphone à la largeur annoncée",
        holes.length === 0, holes.slice(0, 3).join(" | "));
 
-    ok("les bandes sont déphasées, pas décalées géométriquement",
-       new Set([...home.querySelectorAll(".bd-band")]
-           .map(b => b.style.getPropertyValue("--phase"))).size === 3 &&
+    // Les copies s'alignent bout à bout à partir de l'origine : c'est ce qui
+    // rend la boucle sans couture, l'animation translatant d'exactement une
+    // trame. Un décalage géométrique rognerait la couverture d'un côté.
+    ok("les copies s'alignent bout à bout depuis l'origine",
        [...home.querySelectorAll(".bd-band")].every(b =>
            [...b.querySelectorAll("use")].every((u, i) => Number(u.getAttribute("x")) === i * trame)));
 
@@ -1506,7 +1551,7 @@ console.log("\n[26] Actions de fin de mitigation");
     ok("plus de bouton d'enchaînement", !window.document.getElementById("r-next"));
 }
 
-console.log("\n[27] Mention de question commune, forme courte");
+console.log("\n[27] Une question commune ne s'annonce pas");
 {
     window.document.getElementById("brand").click();
     window.document.getElementById("home-new").click();
@@ -1517,12 +1562,15 @@ console.log("\n[27] Mention de question commune, forme courte");
         .find(b => b.dataset.edit === "M1018").click();
     for (let i = 0; i < 4; i++) window.document.querySelector('[data-answer="Oui"]').click();
 
-    const notice = window.document.querySelector(".quiz-shared");
-    const text = notice?.textContent.replace(/\s+/g, " ").trim() ?? "";
-    ok("la mention nomme les mitigations concernées",
-       /M1026/.test(text) && /M1027/.test(text), text);
-    ok("elle tient en une ligne, sans explication", text.length < 60, `${text.length} caractères`);
-    ok("plus de texte pédagogique", !/posée qu'une fois|niveau que chacune/.test(text));
+    // Qu'une question compte pour deux mitigations relève de notre tenue du
+    // catalogue, pas de ce qu'on demande au répondant : il répond à une
+    // question, un point c'est tout. Le lien reste lisible dans le détail de la
+    // mitigation, pour qui va le chercher.
+    ok("aucune mention sur la question elle-même",
+       !window.document.querySelector(".quiz-card .quiz-shared"),
+       window.document.querySelector(".quiz-card .quiz-shared")?.textContent.replace(/\s+/g, " ").trim());
+    ok("mais la question reste posée normalement",
+       !!window.document.querySelector(".quiz-question"));
 }
 
 console.log("\n[28] Rampe de maturité");
@@ -1563,18 +1611,62 @@ console.log("\n[28] Rampe de maturité");
         return (hi + 0.05) / (lo + 0.05);
     };
 
+    // Distance perceptuelle entre deux couleurs, dans OKLab : elle tient compte
+    // de la teinte autant que de la clarté. C'est la mesure qui convient à deux
+    // rampes construites sur des principes opposés.
+    const oklab = hex => {
+        const [R, G, B] = channels(hex).map(srgbToLin);
+        const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+        const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+        const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+        return [
+            0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+        ];
+    };
+    const distance = (a, b) => {
+        const [A, B] = [oklab(a), oklab(b)];
+        return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+    };
+
     const dark = rampOf(/^:root\s*\{([\s\S]*?)\n\}/m.exec(tokens)[1]);
+
+    // Sur fond sombre, la rampe s'ordonne par la clarté : plus mature, plus
+    // lumineux. C'est ce qui la rend lisible là où tout baigne dans le noir.
+    const ls = dark.map(lightness);
+    const gaps = ls.slice(1).map((l, i) => l - ls[i]);
+    ok("rampe sombre : clarté monotone", new Set(gaps.map(Math.sign)).size === 1,
+       gaps.map(g => g.toFixed(3)).join(" "));
+    ok("rampe sombre : écarts de clarté au moins de 0,06",
+       gaps.every(g => Math.abs(g) >= 0.06),
+       `écart minimal ${Math.min(...gaps.map(Math.abs)).toFixed(3)}`);
+
+    // Sur fond clair, c'est un feu tricolore : la teinte porte le sens, et le
+    // rouge doit peser. La clarté n'y est donc pas monotone — le jaune est le
+    // palier le plus clair, le vert redescend — et l'exiger reviendrait à
+    // reprendre la rampe qu'on vient d'écarter, où le niveau 0 était un rose
+    // pâle qui ne se lisait pas comme un danger.
+    ok("rampe claire : le niveau 0 est un vrai rouge, pas un rose",
+       lightness(bySystem[0]) < 0.65, `clarté ${lightness(bySystem[0]).toFixed(3)}`);
+    ok("rampe claire : mais le rouge est adouci, pas criard",
+       bySystem[0].toLowerCase() !== "#ff0000" && lightness(bySystem[0]) > 0.5,
+       bySystem[0]);
+
+    // Ce qui vaut pour les deux, et remplace la monotonie côté clair : deux
+    // paliers ne doivent jamais se confondre — y compris non voisins, un « 1 »
+    // et un « 3 » se retrouvant côte à côte dans la grille.
     for (const [name, ramp, inks] of [
-        ["sombre", dark, [0, 1].map(() => "#ffffff").concat(["#0b0b0b", "#0b0b0b", "#0b0b0b"])],
-        ["clair", bySystem, ["#0b0b0b", "#0b0b0b", "#0b0b0b", "#0b0b0b", "#ffffff"]],
+        ["sombre", dark, ["#ffffff", "#ffffff", "#0b0b0b", "#0b0b0b", "#0b0b0b"]],
+        ["clair", bySystem, ["#ffffff", "#0b0b0b", "#0b0b0b", "#0b0b0b", "#0b0b0b"]],
     ]) {
-        const ls = ramp.map(lightness);
-        const gaps = ls.slice(1).map((l, i) => l - ls[i]);
-        ok(`rampe ${name} : clarté monotone`, new Set(gaps.map(Math.sign)).size === 1,
-           gaps.map(g => g.toFixed(3)).join(" "));
-        ok(`rampe ${name} : écarts de clarté au moins de 0,06`,
-           gaps.every(g => Math.abs(g) >= 0.06),
-           `écart minimal ${Math.min(...gaps.map(Math.abs)).toFixed(3)}`);
+        // Seuil à 0,09 : c'est ce que tient la rampe sombre, en place et jugée
+        // bonne, entre ses deux verts les plus proches. La rampe claire est plus
+        // large — 0,12 au pire.
+        const paires = ramp.flatMap((a, i) => ramp.slice(i + 1).map(b => distance(a, b)));
+        ok(`rampe ${name} : deux paliers ne se confondent jamais`,
+           paires.every(d => d >= 0.09),
+           `paire la plus proche ${Math.min(...paires).toFixed(3)}`);
         const inkRatios = ramp.map((c, i) => contrast(c, inks[i]));
         ok(`rampe ${name} : encre lisible sur chaque palier`,
            inkRatios.every(r => r >= 4.5),
@@ -1718,12 +1810,22 @@ console.log("\n[30] Tenue sur écran étroit");
        fonds.join(" "));
     ok("son masque se resserre quand le contenu prend toute la largeur",
        /@media\s*\(max-width:\s*700px\)\s*\{[^}]*\.home-backdrop\s*\{[^}]*mask-image/.test(homeCss));
-    // Trois chiffres sur deux colonnes : `auto-fit` replie une colonne vide, pas
-    // un trou en fin de ligne.
-    ok("les chiffres ne laissent pas de case vide sur deux colonnes",
-       /\.home-stats \.stat:last-child:nth-child\(odd\)\s*\{\s*grid-column:\s*1 \/ -1/.test(homeCss));
-    ok("empilées, les trois étapes mettent leur numéro en regard du titre",
-       /\.step-num\s*\{\s*grid-row:\s*span 2/.test(homeCss));
+    // Les chiffres ont perdu leur grille cloisonnée : trois nombres posés, sans
+    // cadre. Sur écran étroit ils gardent une seule ligne — trois colonnes
+    // explicites, donc jamais de trou en fin de ligne à reboucher.
+    ok("les chiffres tiennent sur une ligne sur écran étroit",
+       /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.home-figures\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\)/.test(homeCss));
+    ok("et ils ne sont plus enfermés dans une grille bordée",
+       !/\.home-stats/.test(homeCss) &&
+       !/\.home-figures\s*\{[^}]*background:\s*var\(--border\)/.test(homeCss));
+
+    // Empilées, les étapes passent leur numéro à gauche du texte et le filet du
+    // parcours bascule à la verticale : il relie encore chaque étape à la
+    // suivante, au lieu de disparaître comme le faisait la flèche.
+    ok("empilées, les étapes mettent leur numéro à gauche du texte",
+       /@media\s*\(max-width:\s*700px\)\s*\{[\s\S]*?\.step\s*\{[^}]*padding:\s*0 0 0 40px/.test(homeCss));
+    ok("et le filet du parcours passe à la verticale",
+       /@media\s*\(max-width:\s*700px\)\s*\{[\s\S]*?\.step:not\(:last-child\)::after\s*\{[^}]*width:\s*1px/.test(homeCss));
 
     // Le badge de version ne vit que sur l'accueil : ailleurs il n'apprend rien
     // et dispute la barre haute à l'onglet du layer, qui porte l'avancement.
@@ -2116,7 +2218,7 @@ console.log("\n[32] Mise en forme du classeur");
     ok("un classeur déposé dans l'interface est repris",
        progress(importe).answered === progress(complet).answered,
        `${progress(importe).answered} réponses reprises sur ${progress(complet).answered}`);
-    // Le fichier ne porte plus le nom du layer — il s'appelle « matrice-mitre »,
+    // Le fichier ne porte plus le nom du layer — il s'appelle « maptrix »,
     // suffixé de l'organisation. C'est donc la feuille Métadonnées qui rend son
     // identité à l'évaluation ; sans cette lecture, un aller-retour par le
     // classeur la rebaptiserait du nom du fichier et perdrait l'organisation,
@@ -2125,7 +2227,7 @@ console.log("\n[32] Mise en forme du classeur");
        importe.name === "Pleine échelle", importe.name);
     ok("l'organisation revient avec, et renomme le fichier à l'identique",
        importe.respondent.org === "Direction des SI" &&
-       exportName(importe) === "matrice-mitre-direction-des-si",
+       exportName(importe) === "maptrix-direction-des-si",
        `${importe.respondent.org} → ${exportName(importe)}`);
     ok("la méthode de notation survit au passage par le classeur",
        importe.scoring === "cumulative", importe.scoring);
@@ -2202,13 +2304,13 @@ console.log("\n[34] Le fichier exporté porte l'organisation");
     const champ = window.document.getElementById("ex-org");
     ok("l'organisation se saisit au moment d'exporter", !!champ);
     ok("elle est facultative : sans elle, le fichier porte le nom de l'outil",
-       window.document.getElementById("ex-name").textContent.startsWith("matrice-mitre."),
+       window.document.getElementById("ex-name").textContent.startsWith("maptrix."),
        window.document.getElementById("ex-name").textContent);
 
     champ.value = "Groupe Étoile & Cie";
     champ.oninput();
     ok("le nom du fichier s'annonce avant de cliquer",
-       window.document.getElementById("ex-name").textContent === "matrice-mitre-groupe-etoile-cie.xlsx / .json",
+       window.document.getElementById("ex-name").textContent === "maptrix-groupe-etoile-cie.xlsx / .json",
        window.document.getElementById("ex-name").textContent);
 
     // Le nom du layer, lui, est libre : il n'a jamais fait un bon nom de fichier.
@@ -2251,6 +2353,109 @@ console.log("\n[35] Ce qui a été retiré du questionnaire");
        !/doc-flag/.test(quizCss));
     ok("la case outil reste, et reste facultative",
        /Outil en place, si applicable/.test(readFileSync(`${ROOT}/js/views/quiz.js`, "utf8")));
+}
+
+console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
+{
+    const { needsTool } = await import(`${ROOT}/js/tool-questions.js`);
+    const { QUESTIONNAIRES: QS } = await import(`${ROOT}/js/catalog.js`);
+
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+
+    // L'en-tête de question portait trois indications sur le même sujet : la
+    // frise, sa légende, et « Niveau visé : 1 — Informel » juste en dessous. La
+    // frise reste seule — elle situe le niveau parmi les cinq, ce que les deux
+    // autres ne faisaient que redire en mots.
+    ok("la frise des niveaux reste", !!window.document.querySelector(".level-track"));
+    ok("sa légende est retirée", !window.document.querySelector(".track-caption"));
+    ok("le niveau visé n'est plus écrit sous la question",
+       !window.document.querySelector(".quiz-card-level"));
+    ok("la barre d'avancement reste, sans son double chiffré",
+       !!window.document.querySelector(".quiz-progress-bar") &&
+       !window.document.querySelector(".quiz-progress-label"));
+
+    // Reculer depuis la première question n'a pas de sens : le bouton n'est pas
+    // affiché plutôt que désactivé — un bouton grisé se propose encore.
+    ok("« Précédent » est absent sur la première question",
+       !window.document.getElementById("q-back"));
+    window.document.querySelector('[data-answer="Oui"]').click();
+    ok("et il apparaît dès la deuxième", !!window.document.getElementById("q-back"));
+
+    /* --- le champ « Outil en place » --- */
+
+    // La colonne F du classeur est vide partout : elle attend la saisie du
+    // répondant, elle ne déclare pas qui la mérite. Le champ est donc déduit du
+    // texte de la question — un moyen technique déployé, oui ; une pratique ou
+    // une politique, non.
+    const q = id => QS.get(id).questions;
+    ok("un moyen technique demande l'outil",
+       needsTool("M1049", q("M1049").find(x => /antivirus/i.test(x.text))),
+       "M1049 · antivirus");
+    ok("une formation n'en demande pas",
+       !needsTool("M1013", q("M1013").find(x => /formation/i.test(x.text))),
+       "M1013 · formation");
+    ok("une politique formelle non plus",
+       !needsTool("M1031", q("M1031").find(x => /politique formelle/i.test(x.text))),
+       "M1031 · politique");
+    // Une phrase qui cite des produits en exemple demande un produit, quoi
+    // qu'elle dise par ailleurs.
+    ok("citer des produits en exemple tranche la question",
+       needsTool("M1045", q("M1045").find(x => /AppLocker/.test(x.text))),
+       "M1045 · (ex : AppLocker, WDAC…)");
+
+    // Le champ ne concerne qu'une minorité de questions : s'il apparaissait
+    // partout, il cesserait d'être une demande pour devenir un décor.
+    let avec = 0, total = 0;
+    for (const [id, quest] of QS) {
+        total += quest.questions.length;
+        avec += quest.questions.filter(x => needsTool(id, x)).length;
+    }
+    ok("il ne s'affiche que sur une minorité de questions",
+       avec > 0 && avec < total * 0.5, `${avec} sur ${total}`);
+
+    ok("les deux phrases sous le champ sont retirées",
+       !window.document.querySelector(".quiz-tool .help") &&
+       !window.document.querySelector(".quiz-refs"));
+
+    /* --- faire suivre la question --- */
+
+    // Personne ne connaît les quarante-trois sujets. Plutôt que de laisser
+    // répondre à peu près, on prépare le message pour qui saura.
+    window.document.getElementById("q-ask").click();
+    const corps = window.document.getElementById("ask-body")?.value ?? "";
+    const question = window.document.querySelector(".quiz-question")?.textContent.trim() ?? "";
+    ok("le message reprend la question mot pour mot", corps.includes(question),
+       corps.slice(0, 60));
+    ok("il situe la mitigation et explique les trois réponses",
+       /M1013/.test(corps) && /Oui/.test(corps) && /Non/.test(corps) && /N\/A/.test(corps));
+    // Rien ne part d'ici : le site ne parle à aucun service.
+    ok("rien n'est envoyé, on copie ou on ouvre sa messagerie",
+       !!window.document.getElementById("ask-copy") &&
+       window.document.getElementById("ask-mail")?.getAttribute("href").startsWith("mailto:"));
+    window.document.querySelector("#modal .modal-close").click();
+}
+
+console.log("\n[35c] Pas de liseré d'accent à gauche des blocs");
+{
+    // Le liseré coloré posé sur le bord gauche d'un bloc — encadré d'aide,
+    // note, carte de question — était devenu la signature visuelle de la page.
+    // Un bloc se distingue par sa surface et son cadre ; la couleur qu'on lui
+    // collait au flanc ne portait aucune information que le bloc ne dise déjà.
+    const liserets = [];
+    for (const f of ["base", "home", "matrix", "quiz", "tokens"]) {
+        const css = readFileSync(`${ROOT}/css/${f}.css`, "utf8");
+        for (const m of css.matchAll(/border-left:\s*([^;]+);/g)) {
+            // Un filet d'un pixel dans le ton des bordures est structurel : il
+            // marque un retrait, il ne décore pas.
+            if (!/^1px solid var\(--border(-strong)?\)$/.test(m[1].trim())) {
+                liserets.push(`${f}.css → ${m[1].trim()}`);
+            }
+        }
+    }
+    ok("aucun bloc ne porte de liseré coloré à gauche", liserets.length === 0,
+       liserets.join(" · ") || "aucun");
 }
 
 console.log("\n[36] Un téléchargement qui échoue est retenté");

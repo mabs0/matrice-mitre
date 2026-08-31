@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CTRM — Diagnostic de maturité cyber sur MITRE ATT&amp;CK</title>
+    <title>MAPTRIX — Diagnostic de maturité cyber sur MITRE ATT&amp;CK</title>
     <meta name="description" content="Outil de diagnostic de la maturité cyber d'une organisation, fondé sur les mesures d'atténuation du framework MITRE ATT&amp;CK Enterprise.">
 
     <link rel="stylesheet" href="css/tokens.css">
@@ -69,7 +69,7 @@
 
         var modules = [
             "attack", "catalog", "excel", "io", "layer", "main", "scoring",
-            "shared-questions", "theme", "ui",
+            "shared-questions", "theme", "tool-questions", "ui",
             "views/home", "views/home-visuals", "views/matrix", "views/quiz",
         ];
         // Clés et valeurs en URL absolues. Une valeur relative doit commencer
@@ -145,12 +145,6 @@
         <div class="bar" id="boot-bar"><span></span></div>
         <p class="pct" id="boot-pct"></p>
         <p class="sub" id="boot-status">Initialisation…</p>
-        <p class="sub" style="font-size:0.72rem;color:var(--text-mute);">
-            La version publiée par MITRE est vérifiée à chaque chargement, pour que la
-            matrice soit toujours à jour. Le premier chargement transfère environ 9 Mo ;
-            les suivants repartent du cache du navigateur, sauf si MITRE a publié une
-            nouvelle version.
-        </p>
     </div>
 
     <!--
@@ -207,7 +201,7 @@
     <header id="topbar">
         <button class="brand" id="brand" title="Retour à l'accueil">
             <svg class="brand-mascot" viewBox="0 0 64 64" aria-hidden="true"><use href="#mascot"/></svg>
-            CTRM <small>maturité cyber</small>
+            MAPTRIX <small>maturité cyber</small>
         </button>
 
         <div id="layer-tabs"></div>

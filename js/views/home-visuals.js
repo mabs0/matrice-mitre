@@ -3,7 +3,9 @@
 
    Tous deux sont des **exemples**, pas des données : au premier chargement il n'y
    a aucune évaluation à montrer, et l'accueil doit tout de même donner à voir ce
-   que l'outil produit. Ils sont donc explicitement légendés comme tels.
+   que l'outil produit. La légende qui le disait sous la rosace a été retirée —
+   elle expliquait l'évidence à un lecteur qui n'a encore rien saisi. Le statut
+   d'exemple reste porté par le `aria-label`, pour qui ne voit pas le dessin.
 
    Rien d'externe, rien de calculé au fil du temps : du SVG statique et deux
    animations CSS confiées au compositeur. Les deux respectent
@@ -163,21 +165,23 @@ export function rosace(data) {
                 <text class="ros-value" x="${c}" y="${c - 1}">${average}</text>
                 <text class="ros-unit" x="${c}" y="${c + 12}">/ 4</text>
             </svg>
-            <figcaption>
-                <b>Exemple</b> — un rayon par tactique ATT&amp;CK, le tracé donne le niveau atteint.
-                Votre rosace se dessine au fil du questionnaire.
-            </figcaption>
         </figure>`;
 }
 
 /* ------------------------------------------------- la matrice en arrière-plan */
 
+/* Une seule bande, et des cases plus grandes.
+   Trois bandes de vitesses différentes donnaient trois fois la même découpe à
+   trois hauteurs : la répétition sautait aux yeux et la matrice n'était plus
+   reconnaissable, juste un motif. Une bande unique, avec des cases assez larges
+   pour qu'on lise les en-têtes de tactique, redonne à l'accueil ce qu'il doit
+   montrer — la vraie silhouette d'ATT&CK. */
 const BACKDROP = {
-    cellW: 68, cellH: 12, gap: 3,
-    header: 20,        // hauteur de l'en-tête de tactique
+    cellW: 92, cellH: 16, gap: 4,
+    header: 26,        // hauteur de l'en-tête de tactique
     maxRows: 28,       // les tactiques les plus fournies sont écrêtées
     repeats: 2,        // blocs de matrice côte à côte dans une trame
-    bands: 3,
+    bands: 1,
     /* Plancher de largeur à couvrir. La largeur réelle est celle de la fenêtre,
        ce plancher lui laissant de la marge pour une rotation ou un
        redimensionnement — le fond n'est pas recomposé à chaque resize. Le nombre
@@ -189,8 +193,8 @@ const BACKDROP = {
     coverFloor: 1440,
 };
 
-/** Durées de défilement, une par bande. Décalées pour donner de la profondeur. */
-const BAND_DURATIONS = [118, 156, 134];
+/** Durée de défilement. Lente : le fond doit vivre, pas attirer l'œil. */
+const BAND_DURATIONS = [190];
 
 /**
  * Générateur déterministe. Deux rendus successifs doivent donner exactement la
