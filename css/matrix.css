@@ -141,7 +141,7 @@
 
 /* --------------------------------------------- liste des mitigations notées */
 
-.mit-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 
 .mit-row {
     display: flex;
@@ -352,23 +352,43 @@
 /* La note est posée en absolu dans l'angle : on lui réserve sa place à droite,
    sinon l'identifiant passe dessous dans une colonne étroite. */
 #matrix-grid.fit .cell { padding: 3px 16px 3px 4px; }
-#matrix-grid.fit .tactic-head { padding: 6px 3px 5px; }
-/* Le compteur de techniques est le premier à sauter quand la colonne devient
-   étroite : c'est un repère, pas une donnée qu'on vient chercher. */
-@media (max-width: 1500px) {
-    #matrix-grid.fit .tactic-head .t-meta { display: none; }
-}
+#matrix-grid.fit .tactic-head { padding: 5px 3px; }
+/* En plein écran, la barre d'avancement de chaque tactique disparaît : quinze
+   traits bleus alignés sous quinze titres tirent l'œil vers eux alors que ce
+   qu'on vient lire, ce sont les couleurs des cases en dessous. Elle reste dans
+   le tableau de bord, où la matrice n'est qu'un panneau parmi d'autres. */
+#matrix-grid.fit .tactic-head .t-bar { display: none; }
 
 .tactic-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
+/* Colonne mise en avant depuis un sommet de la rosace. C'est la colonne entière
+   qui répond, pas des cases éparses : la tactique est justement l'axe de lecture
+   de la matrice. */
+.tactic-col.faded { opacity: 0.2; }
+.tactic-col.picked .tactic-head {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+}
+.tactic-col.picked .tactic-head .t-name { color: var(--accent); }
+
+/* Hauteur commune à tous les en-têtes.
+   « Resource Development » passe à la ligne là où « Execution » tient sur une :
+   l'en-tête devenait plus haut que ses voisins et décalait toute sa colonne
+   vers le bas, si bien que les cases ne s'alignaient plus d'une colonne à
+   l'autre. Une hauteur unique, avec le nom centré dedans, aligne les rangées
+   quel que soit le nombre de lignes du titre. */
 .tactic-head {
     position: sticky;
     top: 0;
     z-index: 20;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 44px;
     background: var(--surface-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    padding: 7px 6px 6px;
+    padding: 6px;
     text-align: center;
 }
 .tactic-head .t-name {
@@ -376,12 +396,7 @@
     font-weight: 650;
     line-height: 1.22;
     letter-spacing: -0.005em;
-}
-.tactic-head .t-meta {
-    font-size: 0.57rem;
-    color: var(--text-mute);
-    margin-top: 3px;
-    font-variant-numeric: tabular-nums;
+    text-wrap: balance;
 }
 .tactic-head .t-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 6px; overflow: hidden; }
 .tactic-head .t-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
@@ -475,8 +490,14 @@
 .cell.highlighted { outline-color: var(--accent); z-index: 4; }
 
 /* Correspondance de recherche : teinte réservée, pour ne pas se confondre avec
-   un niveau de maturité ni avec le surlignage d'une mitigation. */
-.cell.match { outline-color: var(--find); z-index: 4; }
+   un niveau de maturité ni avec le surlignage d'une mitigation. Le liseré est
+   plus épais que celui du surlignage — chercher une technique, c'est vouloir la
+   repérer dans une grille de plusieurs centaines de cases. */
+.cell.match {
+    outline: 3px solid var(--find);
+    outline-offset: -1px;
+    z-index: 6;
+}
 
 /* ---------------------------------------------------------------- messages */
 

@@ -617,11 +617,16 @@ ok("le chiffrement est coché par défaut", window.document.getElementById("ex-c
 
 console.log("\n[15] Bascule de thème");
 const toggle = window.document.getElementById("theme-toggle");
-ok("sombre par défaut", (window.document.documentElement.dataset.theme || "dark") === "dark");
+// Clair par défaut, et posé explicitement plutôt que laissé au réglage du
+// système : l'outil produit des captures et des exports qui finissent dans des
+// rapports, lesquels sont sur fond blanc.
+ok("clair par défaut, quel que soit le réglage du système",
+   window.document.documentElement.dataset.theme === "light",
+   window.document.documentElement.dataset.theme || "aucun");
 toggle.click();
-ok("passage en clair estampillé sur <html>", window.document.documentElement.dataset.theme === "light");
+ok("passage en sombre estampillé sur <html>", window.document.documentElement.dataset.theme === "dark");
 toggle.click();
-ok("retour en sombre", window.document.documentElement.dataset.theme === "dark");
+ok("retour en clair", window.document.documentElement.dataset.theme === "light");
 
 /* ------------------------------------- import chiffré par l'interface */
 
@@ -1248,11 +1253,14 @@ window.document.getElementById("brand").click();
     ok("un sommet par tactique", dots.length === tactiques.length, String(dots.length));
     ok("chaque sommet porte un niveau de 0 à 4",
        [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
+    // Le libellé est porté par le groupe qui réunit la pastille et sa zone de
+    // saisie : posé sur la seule pastille, il ne s'affichait pas au survol de la
+    // zone, qui la recouvre.
     ok("chaque sommet nomme sa tactique au survol",
-       [...dots].map(d => (d.querySelector("title")?.textContent ?? "")
+       [...dots].map(d => (d.closest(".ros-vertex")?.querySelector("title")?.textContent ?? "")
            .replace(/ — (niveau [0-4],\d|non évaluée)$/, ""))
            .join("|") === tactiques.join("|"),
-       dots[0]?.querySelector("title")?.textContent);
+       dots[0]?.closest(".ros-vertex")?.querySelector("title")?.textContent);
     ok("les sommets apparaissent l'un après l'autre",
        [...dots].map(d => d.style.getPropertyValue("--i")).join(",")
            === [...dots].map((_, i) => String(i)).join(","));
@@ -2660,6 +2668,43 @@ console.log("\n[35c] Le tableau de bord");
     autre.dispatchEvent(new window.Event("change"));
     ok("changer de méthode de notation les redessine",
        window.document.querySelector("#dash-rosace .rosace") !== avant);
+
+    /* --- cliquer un sommet de la rosace met sa colonne en avant --- */
+
+    // Le creux qu'on repère sur la rosace se regarde ensuite en détail sur la
+    // carte : sans ce lien, il faut retrouver la tactique des yeux parmi quinze
+    // colonnes.
+    const sommet = window.document.querySelector("#dash-rosace .ros-hit");
+    const tactique = sommet?.dataset.tactic;
+    ok("chaque sommet porte l'identifiant de sa tactique", !!tactique, tactique);
+    // Une pastille de 2,6 px de rayon ne s'attrape ni à la souris ni au doigt :
+    // la zone de saisie est un disque transparent bien plus large.
+    ok("et une zone de saisie assez large pour être attrapée",
+       Number(sommet.getAttribute("r")) >= 8, `r=${sommet.getAttribute("r")}`);
+
+    // Un élément SVG n'a pas de `.click()` — c'est une méthode de HTMLElement.
+    const cliquer = el => el.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+
+    cliquer(sommet);
+    const choisie = window.document.querySelector(`.tactic-col[data-tactic="${tactique}"]`);
+    const autres = [...window.document.querySelectorAll(".tactic-col")]
+        .filter(c => c.dataset.tactic !== tactique);
+    ok("la colonne de la tactique ressort", choisie?.classList.contains("picked"),
+       [...(choisie?.classList ?? [])].join(" "));
+    ok("et les autres s'effacent", autres.length > 0 && autres.every(c => c.classList.contains("faded")));
+
+    // Les deux mises en avant s'excluent : la carte ne répond qu'à une question
+    // à la fois.
+    window.document.querySelector('[data-mitigation="M1032"]').click();
+    ok("choisir une mitigation éteint la mise en avant de la tactique",
+       !window.document.querySelector(".tactic-col.picked, .tactic-col.faded"));
+    cliquer(window.document.querySelector("#dash-rosace .ros-hit"));
+    ok("et réciproquement",
+       !window.document.querySelector(".cell.highlighted, .cell.dimmed") &&
+       !!window.document.querySelector(".tactic-col.picked"));
+    cliquer(window.document.querySelector("#dash-rosace .ros-hit"));
+    ok("re-cliquer le même sommet éteint la mise en avant",
+       !window.document.querySelector(".tactic-col.picked, .tactic-col.faded"));
 
     /* --- exporter la rosace --- */
 

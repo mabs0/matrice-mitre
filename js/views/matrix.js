@@ -31,7 +31,11 @@ const view = {
     platformsReady: false,
     showSubs: false,
     expanded: null,            // nom du panneau en plein écran, ou null
+    /* Deux façons de désigner ce qu'on veut voir ressortir dans la matrice, et
+       elles s'excluent : la carte ne peut répondre qu'à une question à la fois.
+       Choisir l'une éteint l'autre. */
     highlight: "",             // mitigation sélectionnée dans la liste
+    tactic: "",                // tactique sélectionnée sur la rosace
 };
 
 /** Bouton d'agrandissement, en haut à droite de chaque panneau. */
@@ -407,18 +411,26 @@ function paint(app) {
         visibleTotal += shown.length;
 
         const column = document.createElement("div");
-        column.className = "tactic-col";
+        // Une tactique sélectionnée sur la rosace met sa colonne en avant et
+        // éteint les autres — même grammaire que le surlignage d'une mitigation.
+        const retenue = !view.tactic || view.tactic === tactic.shortname;
+        column.className = `tactic-col${view.tactic ? (retenue ? " picked" : " faded") : ""}`;
+        column.dataset.tactic = tactic.shortname;
 
         const scored = shown.filter(t => scores.get(t.id)?.state === CELL_STATE.SCORED).length;
         const pct = shown.length ? Math.round((scored / shown.length) * 100) : 0;
 
+        // Plus de « 11 techniques · 6 évaluées » : la colonne montre déjà ses
+        // cases et leurs couleurs, le compte n'ajoutait qu'une ligne de chiffres
+        // au-dessus de chacune des quinze colonnes. Le décompte reste dans
+        // l'infobulle, pour qui le cherche.
         const head = document.createElement("div");
         head.className = "tactic-head";
         head.innerHTML = `
             <div class="t-name">${esc(tactic.name)}</div>
-            <div class="t-meta">${shown.length}${shown.length !== all.length ? `/${all.length}` : ""} techniques · ${scored} évaluées</div>
             <div class="t-bar"><span style="width:${pct}%"></span></div>`;
-        head.title = `${tactic.id} — ${tactic.name}`;
+        head.title = `${tactic.id} — ${tactic.name} · ${shown.length}`
+            + `${shown.length !== all.length ? `/${all.length}` : ""} techniques, ${scored} évaluées`;
         column.appendChild(head);
 
         for (const tech of shown) {
@@ -480,8 +492,24 @@ function paintSide(app) {
     const scores = buildMatrixScores(app.data, app.layer);
     const host = $("#dash-rosace");
     // La rosace, sur les niveaux réellement atteints — pas l'exemple de l'accueil.
-    if (host) host.innerHTML = rosace(app.data, tacticLevels(app.data, scores));
+    if (host) {
+        host.innerHTML = rosace(app.data, tacticLevels(app.data, scores));
+        // Cliquer un sommet met en avant la colonne correspondante de la
+        // matrice : le creux qu'on voit sur la rosace se regarde ensuite en
+        // détail, sur la carte, sans avoir à retrouver la tactique des yeux.
+        for (const cible of $$("#dash-rosace .ros-hit")) {
+            cible.onclick = () => choisirTactique(app, cible.dataset.tactic);
+        }
+    }
     paintMitigations(app);
+}
+
+/** Sélectionne — ou désélectionne — la tactique à mettre en avant. */
+function choisirTactique(app, shortname) {
+    view.tactic = view.tactic === shortname ? "" : shortname;
+    view.highlight = "";           // les deux mises en avant s'excluent
+    paintMitigations(app);
+    paint(app);
 }
 
 /**
@@ -500,12 +528,10 @@ function paintMitigations(app) {
     if (!host) return;
 
     const levels = mitigationLevels(app.layer);
-    const evaluees = app.data.mitigations.filter(m => levels.has(m.id));
 
+    // Pas de décompte au-dessus de la liste : les notes en regard de chaque
+    // ligne le disent déjà, et d'un coup d'œil.
     host.innerHTML = `
-        <p class="panel-note">${evaluees.length} évaluée${evaluees.length > 1 ? "s" : ""}
-            sur ${app.data.mitigations.length}${view.highlight
-                ? ` · <b>${esc(view.highlight)}</b> surlignée` : ""}</p>
         <ul class="mit-list">
             ${app.data.mitigations.map(m => {
                 const level = levels.get(m.id);
@@ -540,6 +566,7 @@ function paintMitigations(app) {
         // sélectionne est celui qui désélectionne.
         row.onclick = () => {
             view.highlight = view.highlight === row.dataset.mitigation ? "" : row.dataset.mitigation;
+            view.tactic = "";       // les deux mises en avant s'excluent
             paintMitigations(app);
             paint(app);
         };
@@ -712,5 +739,6 @@ export function resetMatrixView() {
     view.showSubs = false;
     view.platformsReady = false;
     view.highlight = "";
+    view.tactic = "";
     view.expanded = null;
 }

@@ -16,7 +16,9 @@
     --surface-3: #212734;
     --border: #2a3140;
     --border-strong: #3a4354;
-    --toile: #99a3b4;      /* toile de la rosace : nettement plus claire que les bordures */
+    /* Toile de la rosace. Bien plus claire que les bordures : sur fond sombre,
+       une toile au ton des cadres disparaît, et le tracé flotte sans repère. */
+    --toile: #c3ccdb;
     --text: #e8eaf0;
     --text-dim: #98a1b3;
     --text-mute: #6b7484;
@@ -74,7 +76,7 @@
         --surface-3: #efefeb;
         --border: #dcdcd5;
         --border-strong: #c3c2b7;
-        --toile: #96958c;
+        --toile: #6f6e66;
         --text: #0b0b0b;
         --text-dim: #52514e;
         --text-mute: #898781;
@@ -132,7 +134,7 @@
     --surface-3: #efefeb;
     --border: #dcdcd5;
     --border-strong: #c3c2b7;
-    --toile: #96958c;
+    --toile: #6f6e66;
     --text: #0b0b0b;
     --text-dim: #52514e;
     --text-mute: #898781;

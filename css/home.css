@@ -164,12 +164,12 @@
    au-delà d'un certain rapport largeur/hauteur rend la main à la largeur. */
 /* Le facteur en `vh` est ce qui décide que les deux cartes tiennent sous la
    ligne de flottaison. Mesuré : titre sur deux lignes (~88 px), accroche sur
-   trois (~71 px), cartes (~224 px) et les interlignes laissent environ 40 % de
-   la hauteur à la rosace. Au-delà, les cartes passent sous le pli. */
+   trois (~71 px), cartes (~224 px) et les interlignes. Le reste va à la rosace,
+   soit 44 % de la hauteur — au-delà, les cartes passent sous le pli. */
 .rosace {
     display: block;
     margin: 0 auto;
-    height: clamp(190px, 40vh, 500px);
+    height: clamp(200px, 44vh, 520px);
     width: auto;
     max-width: 100%;
     overflow: visible;
@@ -243,7 +243,16 @@
    comme un zéro — rien n'a été mesuré, ce qui ne dit rien de ce qui est en
    place. */
 .ros-dot.vide { fill: var(--surface); stroke: var(--text-mute); }
-.ros-dot:hover { r: 4.5; }
+
+/* Zone de saisie du sommet : invisible, mais assez large pour être attrapée à
+   la souris comme au doigt. Elle recouvre la pastille : c'est donc le groupe
+   qu'on interroge pour le survol, pas la pastille elle-même.
+
+   Le curseur n'annonce une action que là où il y en a une — sur l'accueil, la
+   rosace est un exemple et il n'y a pas de matrice à surligner. */
+.ros-hit { fill: transparent; }
+.ros-vertex:hover .ros-dot { r: 4.8; }
+#dash-rosace .ros-hit { cursor: pointer; }
 
 .ros-hub { fill: var(--surface); stroke: var(--border); stroke-width: 0.6; }
 

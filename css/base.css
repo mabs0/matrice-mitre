@@ -73,11 +73,22 @@ body {
 /* Même règle que dans la liste des mitigations : c'est le nom qui se tronque, le
    compteur d'avancement garde sa place. Sans `min-width: 0`, un élément flex ne
    descend pas sous la largeur de son contenu et pousse ce qui suit. */
-.layer-tab .name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Le nom et le compteur n'ont pas la même taille de police : alignés sur leur
+   ligne de base, l'un paraissait posé plus haut que l'autre. On les cale par le
+   milieu, où l'écart de corps ne se voit pas. */
+.layer-tab .name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.3;
+}
 .layer-tab .pct {
     flex: 0 0 auto;
     font-variant-numeric: tabular-nums;
     font-size: 0.68rem;
+    line-height: 1.3;
     color: var(--text-mute);
 }
 .layer-tab.current .pct { color: var(--accent); }

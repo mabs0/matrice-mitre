@@ -153,12 +153,25 @@ export function rosace(data, reels = null) {
 
     // La pastille prend la couleur du palier le plus proche : la rampe n'a que
     // cinq teintes, une note de 2,3 se lit sur celle du 2.
+    //
+    // Chaque sommet porte le `shortname` de sa tactique : c'est par lui que le
+    // tableau de bord retrouve la colonne à surligner dans la matrice. La zone
+    // cliquable est un disque transparent bien plus large que la pastille — 2,6
+    // px de rayon ne s'attrapent ni à la souris ni au doigt.
     const vertices = levels.map((level, i) => {
         const [x, y] = polar(c, c, radiusOf(level ?? 0), angleOf(i));
         const classes = level === null ? "ros-dot vide" : `ros-dot l${Math.round(level)}`;
         const mot = level === null ? "non évaluée" : `niveau ${level.toFixed(1).replace(".", ",")}`;
-        return `<circle class="${classes}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
-                        style="--i:${i}"><title>${esc(noms[i])} — ${mot}</title></circle>`;
+        const cle = tactiques[i]?.shortname ?? "";
+        const cible = cle
+            ? `<circle class="ros-hit" data-tactic="${esc(cle)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9"/>`
+            : "";
+        return `<g class="ros-vertex">
+                    <circle class="${classes}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
+                            style="--i:${i}"/>
+                    ${cible}
+                    <title>${esc(noms[i])} — ${mot}</title>
+                </g>`;
     }).join("");
 
     // La moyenne ne porte que sur ce qui a été évalué : la diluer avec les
