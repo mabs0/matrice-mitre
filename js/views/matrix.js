@@ -1,17 +1,28 @@
 /* ============================================================================
-   La matrice.
+   Le tableau de bord.
 
-   Construite directement depuis les données ATT&CK relues à chaque chargement.
-   L'ordre des colonnes vient de `tactic_refs`, donc la vue absorbe sans
-   modification une évolution du référentiel — la scission de Defense Evasion
-   en Stealth et Defense Impairment en v19 ajoute simplement une colonne.
+   Trois lectures d'une même évaluation, côte à côte : la rosace donne la forme
+   d'ensemble, la liste des mitigations donne le détail chiffré, la matrice donne
+   la carte. Chacune répond à une question différente — « où en est-on ? »,
+   « laquelle reprendre ? », « quelle zone est découverte ? » — et les avoir
+   ensemble évite d'avoir à s'en souvenir en changeant d'écran.
+
+   Chaque panneau s'agrandit sur toute la surface, par un bouton qui devient une
+   croix : la matrice de quinze tactiques mérite la pleine largeur, et la rosace
+   se lit mieux en grand.
+
+   La matrice elle-même est construite depuis les données ATT&CK relues à chaque
+   chargement. L'ordre des colonnes vient de `tactic_refs`, donc la vue absorbe
+   sans modification une évolution du référentiel — la scission de Defense
+   Evasion en Stealth et Defense Impairment en v19 ajoute simplement une colonne.
    ========================================================================= */
 
 import { esc, $, $$, toast, openModal, closeModal } from "../ui.js";
-import { LEVEL_LABELS, LEVEL_DEFINITIONS, getQuestionnaire } from "../catalog.js";
+import { LEVEL_LABELS, LEVEL_DEFINITIONS, getQuestionnaire, QUESTIONNAIRES } from "../catalog.js";
 import { resolvedEntries } from "../shared-questions.js";
-import { buildMatrixScores, mitigationLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
+import { buildMatrixScores, mitigationLevels, tacticLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
 import { exportExcel, exportJSON, exportName } from "../io.js";
+import { rosace } from "./home-visuals.js";
 
 /** État de vue, volontairement hors du layer : ce n'est pas de la donnée d'évaluation. */
 const view = {
@@ -19,10 +30,24 @@ const view = {
     platforms: new Set(),      // toutes cochées au départ ; vide = tout masqué
     platformsReady: false,
     showSubs: false,
+    expanded: null,            // nom du panneau en plein écran, ou null
 };
 
+/** Bouton d'agrandissement, en haut à droite de chaque panneau. */
+const expandButton = nom => `
+    <button class="panel-expand" data-expand="${nom}" title="Agrandir" aria-label="Agrandir ce panneau">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class="ico-grow">
+            <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" stroke="currentColor"
+                  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class="ico-close">
+            <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor"
+                  stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+    </button>`;
+
 export function renderMatrix(app) {
-    const { data, layer } = app;
+    const { data } = app;
     // On n'initialise qu'une fois : sinon décocher toutes les plateformes serait
     // annulé au prochain rendu de la vue.
     if (!view.platformsReady) {
@@ -31,43 +56,73 @@ export function renderMatrix(app) {
     }
 
     $("#view-matrix").innerHTML = `
-        <div id="matrix-toolbar">
-            <input type="text" id="matrix-search" placeholder="Rechercher une technique…"
-                   value="${esc(view.query)}" autocomplete="off">
+        <div id="dash" ${view.expanded ? `data-expanded="${view.expanded}"` : ""}>
+            <div id="dash-side">
+                <section class="dash-panel" data-panel="rosace">
+                    <div class="panel-head"><h2>Maturité par tactique</h2>${expandButton("rosace")}</div>
+                    <div class="panel-body" id="dash-rosace"></div>
+                </section>
 
-            <div class="dropdown" id="dd-platform">
-                <button class="btn btn-sm" id="dd-platform-btn">
-                    Plateformes <span class="chip-count" id="platform-count"></span>
-                </button>
-                <div class="dropdown-panel" id="platform-panel"></div>
+                <section class="dash-panel" data-panel="mitigations">
+                    <div class="panel-head"><h2>Mitigations</h2>${expandButton("mitigations")}</div>
+                    <div class="panel-body" id="dash-mitigations"></div>
+                </section>
+
+                <section class="dash-panel" data-panel="cve">
+                    <div class="panel-head"><h2>CVE</h2></div>
+                    <div class="panel-body">
+                        <input type="search" id="dash-cve" placeholder="CVE-2026-2525" disabled
+                               autocomplete="off" aria-describedby="dash-cve-note">
+                        <p class="panel-note" id="dash-cve-note">
+                            Retrouver les techniques ATT&amp;CK liées à une vulnérabilité —
+                            à brancher sur <a href="https://galeax.github.io/CVE2CAPEC/"
+                            target="_blank" rel="noopener">CVE2CAPEC</a>.
+                        </p>
+                    </div>
+                </section>
             </div>
 
-            <label class="tool-group" style="cursor:pointer;">
-                <input type="checkbox" id="matrix-subs" ${view.showSubs ? "checked" : ""}>
-                <span class="tool-label">Sous-techniques</span>
-            </label>
+            <section class="dash-panel" data-panel="matrix">
+                <div id="matrix-toolbar">
+                    <input type="text" id="matrix-search" placeholder="Rechercher une technique…"
+                           value="${esc(view.query)}" autocomplete="off">
 
-            <div class="tool-sep"></div>
+                    <div class="dropdown" id="dd-platform">
+                        <button class="btn btn-sm" id="dd-platform-btn">
+                            Plateformes <span class="chip-count" id="platform-count"></span>
+                        </button>
+                        <div class="dropdown-panel" id="platform-panel"></div>
+                    </div>
 
-            <div class="dropdown" id="dd-method">
-                <button class="btn btn-sm" id="dd-method-btn">Méthode de notation</button>
-                <div class="dropdown-panel" id="method-panel" style="min-width:300px;"></div>
-            </div>
+                    <label class="tool-group" style="cursor:pointer;">
+                        <input type="checkbox" id="matrix-subs" ${view.showSubs ? "checked" : ""}>
+                        <span class="tool-label">Sous-techniques</span>
+                    </label>
 
-            <div class="spacer"></div>
+                    <div class="tool-sep"></div>
 
-            <div id="matrix-legend"></div>
+                    <div class="dropdown" id="dd-method">
+                        <button class="btn btn-sm" id="dd-method-btn">Méthode de notation</button>
+                        <div class="dropdown-panel" id="method-panel" style="min-width:300px;"></div>
+                    </div>
 
-            <div class="tool-sep"></div>
+                    <div class="spacer"></div>
 
-            <button class="btn btn-sm" id="matrix-quiz">Questionnaire</button>
-            <div class="dropdown" id="dd-export">
-                <button class="btn btn-sm btn-primary" id="dd-export-btn">Exporter</button>
-                <div class="dropdown-panel" id="export-panel" style="min-width:280px;"></div>
-            </div>
-        </div>
+                    <div id="matrix-legend"></div>
 
-        <div id="matrix-wrapper"><div id="matrix-grid"></div></div>`;
+                    <div class="tool-sep"></div>
+
+                    <button class="btn btn-sm" id="matrix-quiz">Questionnaire</button>
+                    <div class="dropdown" id="dd-export">
+                        <button class="btn btn-sm btn-primary" id="dd-export-btn">Exporter</button>
+                        <div class="dropdown-panel" id="export-panel" style="min-width:280px;"></div>
+                    </div>
+                    ${expandButton("matrix")}
+                </div>
+
+                <div id="matrix-wrapper"><div id="matrix-grid"></div></div>
+            </section>
+        </div>`;
 
     buildLegend();
     buildPlatformFilter(app);
@@ -77,6 +132,10 @@ export function renderMatrix(app) {
     $("#matrix-search").oninput = e => { view.query = e.target.value.trim(); paint(app); };
     $("#matrix-subs").onchange = e => { view.showSubs = e.target.checked; paint(app); };
     $("#matrix-quiz").onclick = () => app.show("quiz");
+
+    for (const button of $$("[data-expand]")) {
+        button.onclick = () => toggleExpand(app, button.dataset.expand);
+    }
 
     for (const id of ["platform", "method", "export"]) {
         $(`#dd-${id}-btn`).onclick = e => {
@@ -88,7 +147,25 @@ export function renderMatrix(app) {
         };
     }
 
+    paintSide(app);
     paint(app);
+}
+
+/**
+ * Bascule un panneau entre sa place dans la grille et le plein écran.
+ * Re-cliquer sur le même bouton, devenu une croix, ramène au tableau de bord.
+ */
+function toggleExpand(app, nom) {
+    view.expanded = view.expanded === nom ? null : nom;
+    const dash = $("#dash");
+    if (view.expanded) dash.dataset.expanded = view.expanded;
+    else delete dash.dataset.expanded;
+
+    for (const button of $$("[data-expand]")) {
+        const actif = button.dataset.expand === view.expanded;
+        button.title = actif ? "Revenir au tableau de bord" : "Agrandir";
+        button.setAttribute("aria-label", button.title);
+    }
 }
 
 /**
@@ -178,11 +255,13 @@ function buildMethodPanel(app) {
         `<div class="hint">Le mode choisi s'applique immédiatement à toute la matrice,
          voyage avec le layer et figure dans l'export.</div>`;
 
+    // Changer de méthode change les notes, donc aussi la rosace et la liste des
+    // mitigations : elles sont redessinées avec la grille.
     $$('#method-panel input[name="scoring"]').forEach(radio => {
-        radio.onchange = () => { app.layer.scoring = radio.value; paint(app); };
+        radio.onchange = () => { app.layer.scoring = radio.value; paintSide(app); paint(app); };
     });
     $$('#method-panel input[name="aggregation"]').forEach(radio => {
-        radio.onchange = () => { app.layer.aggregation = radio.value; paint(app); };
+        radio.onchange = () => { app.layer.aggregation = radio.value; paintSide(app); paint(app); };
     });
 }
 
@@ -275,6 +354,7 @@ function paint(app) {
     const grid = $("#matrix-grid");
     const query = view.query.toLowerCase();
 
+
     $("#platform-count").textContent = view.platforms.size === data.platforms.length
         ? "tout" : String(view.platforms.size);
 
@@ -332,6 +412,67 @@ function paint(app) {
 
 const matchesPlatform = tech =>
     tech.platforms.length === 0 || tech.platforms.some(p => view.platforms.has(p));
+
+/* ------------------------------------------------------ panneaux de gauche
+
+   Redessinés à part de la grille, et seulement quand les notes changent.
+
+   Les rattacher à `paint` les reconstruisait à chaque frappe dans la recherche
+   et à chaque case de plateforme cochée : la rosace rejouait son animation de
+   tracé sous les doigts du répondant. Or filtrer la matrice ne change aucune
+   note — seuls une réponse au questionnaire et un changement de méthode de
+   notation le font. */
+
+/** Les deux panneaux qui dépendent des notes. */
+function paintSide(app) {
+    const scores = buildMatrixScores(app.data, app.layer);
+    const host = $("#dash-rosace");
+    // La rosace, sur les niveaux réellement atteints — pas l'exemple de l'accueil.
+    if (host) host.innerHTML = rosace(app.data, tacticLevels(app.data, scores));
+    paintMitigations(app);
+}
+
+/**
+ * Les mitigations et leur note.
+ *
+ * Les non évaluées restent listées, en gris : ce qui reste à faire fait partie
+ * de l'état des lieux, et les masquer donnerait une liste qui rétrécit à mesure
+ * qu'on avance. Un clic ouvre le questionnaire sur la mitigation.
+ */
+function paintMitigations(app) {
+    const host = $("#dash-mitigations");
+    if (!host) return;
+
+    const levels = mitigationLevels(app.layer);
+    const evaluees = app.data.mitigations.filter(m => levels.has(m.id));
+
+    host.innerHTML = `
+        <p class="panel-note">${evaluees.length} évaluée${evaluees.length > 1 ? "s" : ""}
+            sur ${app.data.mitigations.length}</p>
+        <ul class="mit-list">
+            ${app.data.mitigations.map(m => {
+                const level = levels.get(m.id);
+                const note = level === undefined ? "—" : formatScore(level);
+                const classe = level === undefined ? "mit-score vide" : `mit-score l${Math.round(level)}`;
+                // M1055 décrit les cas où l'on choisit délibérément de ne pas
+                // atténuer : il n'y a pas de maturité à mesurer, donc pas de
+                // questionnaire à ouvrir.
+                const questionnable = QUESTIONNAIRES.has(m.id);
+                return `<li>
+                    <button class="mit-row" ${questionnable ? `data-mitigation="${esc(m.id)}"` : "disabled"}
+                            title="${esc(m.id)} — ${esc(m.name)}${questionnable ? "" : " · sans questionnaire"}">
+                        <span class="${classe}">${note}</span>
+                        <span class="mit-id">${esc(m.id)}</span>
+                        <span class="mit-name">${esc(m.name)}</span>
+                    </button>
+                </li>`;
+            }).join("")}
+        </ul>`;
+
+    for (const row of $$("[data-mitigation]")) {
+        row.onclick = () => app.show("quiz", { mitigation: row.dataset.mitigation });
+    }
+}
 
 function cellFor(app, tech, scores, query, isSub = false) {
     // Une sous-technique hérite de l'état de sa parente : la notation se fait
@@ -480,7 +621,9 @@ function openTechnique(app, tech, scores) {
 
 /** Rafraîchit la matrice si elle est déjà construite (retour du questionnaire). */
 export function repaintMatrix(app) {
-    if ($("#matrix-grid")) paint(app);
+    if (!$("#matrix-grid")) return;
+    paintSide(app);
+    paint(app);
 }
 
 /** Remet les filtres à zéro : appelé quand on change de layer. */

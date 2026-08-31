@@ -1242,7 +1242,8 @@ window.document.getElementById("brand").click();
     ok("chaque sommet porte un niveau de 0 à 4",
        [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
     ok("chaque sommet nomme sa tactique au survol",
-       [...dots].map(d => (d.querySelector("title")?.textContent ?? "").replace(/ — niveau [0-4]$/, ""))
+       [...dots].map(d => (d.querySelector("title")?.textContent ?? "")
+           .replace(/ — (niveau [0-4],\d|non évaluée)$/, ""))
            .join("|") === tactiques.join("|"),
        dots[0]?.querySelector("title")?.textContent);
     ok("les sommets apparaissent l'un après l'autre",
@@ -2437,7 +2438,152 @@ console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
     window.document.querySelector("#modal .modal-close").click();
 }
 
-console.log("\n[35c] Pas de liseré d'accent à gauche des blocs");
+console.log("\n[35c] Le tableau de bord");
+{
+    const { CATALOG: CATA } = await import(`${ROOT}/js/catalog.js`);
+    const { createLayer, setAnswer, toJSON: enJSON, fromJSON: depuisJSON } = await import(`${ROOT}/js/layer.js`);
+    const { buildMatrixScores, tacticLevels } = await import(`${ROOT}/js/scoring.js`);
+    const donnees = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
+
+    // Un layer où une seule mitigation est notée : de quoi distinguer une
+    // tactique mesurée d'une tactique qui ne l'est pas.
+    const l = createLayer({ name: "Tableau de bord" });
+    for (const q of CATA.get("M1032").questions) setAnswer(l, "M1032", q.num, { value: "Oui" });
+
+    window.document.getElementById("brand").click();
+    const zone = window.document.getElementById("home-drop");
+    const depot = new window.Event("drop");
+    depot.dataTransfer = { files: [new window.File([enJSON(l)], "dash.json", { type: "application/json" })] };
+    zone.dispatchEvent(depot);
+    await new Promise(r => setTimeout(r, 80));
+    window.document.getElementById("q-matrix").click();
+
+    // Le layer relu par l'application, avec son catalogue rattaché : c'est lui
+    // que la vue affiche, et donc lui qu'on doit interroger pour comparer.
+    const vu = depuisJSON(enJSON(l));
+
+    // « Voir la matrice » ouvre désormais le tableau de bord : trois lectures de
+    // la même évaluation, au lieu d'une seule.
+    ok("les quatre panneaux sont là",
+       ["rosace", "mitigations", "cve", "matrix"]
+           .every(n => !!window.document.querySelector(`[data-panel="${n}"]`)),
+       ["rosace", "mitigations", "cve", "matrix"]
+           .filter(n => !window.document.querySelector(`[data-panel="${n}"]`)).join(", ") || "tous");
+    ok("la matrice y vit toujours", !!window.document.getElementById("matrix-grid"));
+
+    /* --- la rosace porte les vraies notes, pas l'exemple de l'accueil --- */
+
+    const niveaux = tacticLevels(donnees, buildMatrixScores(donnees, vu));
+    const mesurees = [...niveaux.values()].filter(v => v !== null);
+    ok("une tactique couverte par la mitigation notée est mesurée", mesurees.length > 0,
+       `${mesurees.length} tactique(s) mesurée(s)`);
+    ok("la moyenne centrale ne compte que ce qui est évalué",
+       window.document.querySelector("#dash-rosace .ros-value")?.textContent
+           === (mesurees.reduce((a, b) => a + b, 0) / mesurees.length).toFixed(1).replace(".", ","),
+       window.document.querySelector("#dash-rosace .ros-value")?.textContent);
+    ok("la rosace du tableau de bord ne s'annonce plus comme un exemple",
+       !/exemple/i.test(window.document.querySelector("#dash-rosace .rosace")?.getAttribute("aria-label") ?? ""),
+       window.document.querySelector("#dash-rosace .rosace")?.getAttribute("aria-label"));
+
+    // Une tactique dont aucune technique n'est notée vaut `null` et non zéro :
+    // rien n'a été mesuré, ce qui ne dit rien de ce qui est en place. La
+    // confondre avec un zéro afficherait « aucune pratique » sur une simple
+    // absence de mesure. Vérifié sur un layer vierge, où c'est le cas de toutes.
+    {
+        const vierge = createLayer({ name: "Rien de répondu" });
+        const aucun = tacticLevels(donnees, buildMatrixScores(donnees, vierge));
+        ok("sans aucune réponse, aucune tactique n'est notée zéro",
+           [...aucun.values()].every(v => v === null),
+           [...aucun.values()].join(", "));
+
+        const { rosace } = await import(`${ROOT}/js/views/home-visuals.js`);
+        const bac = window.document.createElement("div");
+        bac.innerHTML = rosace(donnees, aucun);
+        ok("leurs sommets se distinguent d'un zéro sur la rosace",
+           bac.querySelectorAll(".ros-dot.vide").length === donnees.tactics.length,
+           `${bac.querySelectorAll(".ros-dot.vide").length} creux sur ${donnees.tactics.length}`);
+        ok("et la moyenne ne s'invente pas de valeur",
+           bac.querySelector(".ros-value")?.textContent === "—",
+           bac.querySelector(".ros-value")?.textContent);
+    }
+
+    /* --- la liste des mitigations --- */
+
+    const lignes = window.document.querySelectorAll("#dash-mitigations .mit-row");
+    ok("toutes les mitigations sont listées, notées ou non",
+       lignes.length === donnees.mitigations.length, `${lignes.length} lignes`);
+    ok("celle qui est notée porte sa note",
+       window.document.querySelector('[data-mitigation="M1032"] .mit-score')?.textContent === "4",
+       window.document.querySelector('[data-mitigation="M1032"] .mit-score')?.textContent);
+    ok("les autres restent visibles, sans note",
+       !!window.document.querySelector("#dash-mitigations .mit-score.vide"));
+    // M1055 décrit les cas où l'on choisit de ne pas atténuer : pas de maturité
+    // à mesurer, donc pas de questionnaire à ouvrir.
+    ok("celle qui n'a pas de questionnaire ne s'ouvre pas",
+       !window.document.querySelector('[data-mitigation="M1055"]'));
+
+    // Un clic mène au questionnaire de la mitigation : c'est la liste qui sert à
+    // choisir quoi reprendre.
+    window.document.querySelector('[data-mitigation="M1018"]').click();
+    ok("un clic ouvre le questionnaire de la mitigation",
+       window.document.querySelector(".quiz-tag")?.textContent.trim() === "M1018",
+       window.document.querySelector(".quiz-tag")?.textContent.trim());
+
+    /* --- agrandissement --- */
+
+    window.document.getElementById("q-matrix").click();
+    const dash = window.document.getElementById("dash");
+    ok("aucun panneau n'est agrandi au départ", !dash.dataset.expanded);
+
+    window.document.querySelector('[data-expand="matrix"]').click();
+    ok("le bouton agrandit son panneau", dash.dataset.expanded === "matrix", dash.dataset.expanded);
+    // Le même bouton, devenu une croix, ramène au tableau de bord : le geste
+    // pour partir et celui pour revenir sont au même endroit.
+    window.document.querySelector('[data-expand="matrix"]').click();
+    ok("et le même bouton ramène au tableau de bord", !dash.dataset.expanded, dash.dataset.expanded);
+
+    const matrixCss = readFileSync(`${ROOT}/css/matrix.css`, "utf8");
+    ok("la croix ne s'affiche que sur le panneau agrandi",
+       /\.panel-expand \.ico-close\s*\{\s*display:\s*none/.test(matrixCss) &&
+       /#dash\[data-expanded="matrix"\] \[data-expand="matrix"\] \.ico-close/.test(matrixCss));
+    // Une règle plus spécifique qui rallumerait l'icône d'agrandissement ferait
+    // apparaître les deux à la fois sur le panneau ouvert — le cas s'est produit.
+    ok("et rien ne rallume l'icône d'agrandissement par-dessus",
+       !/\.ico-grow\s*\{\s*display:\s*block/.test(matrixCss));
+    ok("un panneau agrandi masque les autres",
+       /#dash\[data-expanded="matrix"\] #dash-side[\s\S]{0,220}display:\s*none/.test(matrixCss));
+
+    /* --- filtrer ne redessine pas ce qui ne change pas --- */
+
+    // La rosace rejoue son animation de tracé à chaque reconstruction. Rattachée
+    // au rendu de la grille, elle se redessinait sous les doigts à chaque frappe
+    // dans la recherche — or filtrer la matrice ne change aucune note.
+    const avant = window.document.querySelector("#dash-rosace .rosace");
+    const recherche = window.document.getElementById("matrix-search");
+    recherche.value = "T10";
+    recherche.dispatchEvent(new window.Event("input"));
+    ok("filtrer la matrice ne reconstruit pas la rosace",
+       window.document.querySelector("#dash-rosace .rosace") === avant);
+    ok("ni la liste des mitigations",
+       window.document.querySelectorAll("#dash-mitigations .mit-row").length === lignes.length);
+
+    // Changer de méthode de notation, en revanche, change bien les notes.
+    const modes = window.document.querySelectorAll('#method-panel input[name="scoring"]');
+    const autre = [...modes].find(r => !r.checked);
+    autre.checked = true;
+    autre.dispatchEvent(new window.Event("change"));
+    ok("changer de méthode de notation les redessine",
+       window.document.querySelector("#dash-rosace .rosace") !== avant);
+
+    /* --- la recherche CVE, prévue mais pas branchée --- */
+
+    const cve = window.document.getElementById("dash-cve");
+    ok("le champ CVE est présent mais désactivé", !!cve && cve.disabled);
+    ok("et il annonce la source sur laquelle il s'appuiera",
+       /CVE2CAPEC/.test(window.document.getElementById("dash-cve-note")?.textContent ?? ""));
+}
+
+console.log("\n[35d] Pas de liseré d'accent à gauche des blocs");
 {
     // Le liseré coloré posé sur le bord gauche d'un bloc — encadré d'aide,
     // note, carte de question — était devenu la signature visuelle de la page.

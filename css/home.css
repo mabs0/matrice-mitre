@@ -223,6 +223,10 @@
 .ros-dot.l2 { fill: var(--lvl2); }
 .ros-dot.l3 { fill: var(--lvl3); }
 .ros-dot.l4 { fill: var(--lvl4); }
+/* Tactique dont aucune technique n'est notée : creuse, pour ne pas se lire
+   comme un zéro — rien n'a été mesuré, ce qui ne dit rien de ce qui est en
+   place. */
+.ros-dot.vide { fill: var(--surface); stroke: var(--text-mute); }
 .ros-dot:hover { r: 4.5; }
 
 .ros-hub { fill: var(--surface); stroke: var(--border); stroke-width: 0.6; }

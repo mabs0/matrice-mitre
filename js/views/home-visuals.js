@@ -71,10 +71,11 @@ function lignesDuNom(nom, maxi = 15) {
  *
  * @param {object} data référentiel ATT&CK normalisé
  */
-export function rosace(data) {
+export function rosace(data, reels = null) {
     const { size, r0, rMax, marge, ecartLibelle } = ROSACE;
     const c = size / 2;
-    const noms = (data?.tactics ?? []).map(t => t.name);
+    const tactiques = data?.tactics ?? [];
+    const noms = tactiques.map(t => t.name);
     if (!noms.length) return "";
     const step = 360 / noms.length;
 
@@ -121,14 +122,23 @@ export function rosace(data) {
     }).join("");
 
     // Le tracé de la maturité.
-    let sum = 0;
-    const levels = noms.map((_, i) => {
-        const level = DEMO_LEVELS[i % DEMO_LEVELS.length];
-        sum += level;
-        return level;
-    });
+    //
+    // Sans niveaux réels — c'est le cas de l'accueil, où aucune évaluation
+    // n'existe encore — on montre un profil d'exemple, faute de quoi la page
+    // s'ouvrirait sur une rosace plate qui n'apprend rien.
+    //
+    // Avec des niveaux réels, une tactique non évaluée vaut `null` : son sommet
+    // se pose au centre et elle ne compte pas dans la moyenne. La confondre avec
+    // un zéro ferait lire « aucune pratique » là où il n'y a qu'une absence de
+    // mesure.
+    const levels = tactiques.map((t, i) => reels
+        ? reels.get(t.shortname) ?? null
+        : DEMO_LEVELS[i % DEMO_LEVELS.length]);
 
-    const points = levels.map((level, i) => polar(c, c, radiusOf(level), angleOf(i)));
+    const notes = levels.filter(l => l !== null);
+    const sum = notes.reduce((a, b) => a + b, 0);
+
+    const points = levels.map((level, i) => polar(c, c, radiusOf(level ?? 0), angleOf(i)));
     const shape = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 
     // Le contour se déroule par `stroke-dasharray` : il faut son périmètre exact,
@@ -139,13 +149,26 @@ export function rosace(data) {
         return total + Math.hypot(x - px, y - py);
     }, 0);
 
+    // La pastille prend la couleur du palier le plus proche : la rampe n'a que
+    // cinq teintes, une note de 2,3 se lit sur celle du 2.
     const vertices = levels.map((level, i) => {
-        const [x, y] = polar(c, c, radiusOf(level), angleOf(i));
-        return `<circle class="ros-dot l${level}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
-                        style="--i:${i}"><title>${esc(noms[i])} — niveau ${level}</title></circle>`;
+        const [x, y] = polar(c, c, radiusOf(level ?? 0), angleOf(i));
+        const classes = level === null ? "ros-dot vide" : `ros-dot l${Math.round(level)}`;
+        const mot = level === null ? "non évaluée" : `niveau ${level.toFixed(1).replace(".", ",")}`;
+        return `<circle class="${classes}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
+                        style="--i:${i}"><title>${esc(noms[i])} — ${mot}</title></circle>`;
     }).join("");
 
-    const average = (sum / noms.length).toFixed(1).replace(".", ",");
+    // La moyenne ne porte que sur ce qui a été évalué : la diluer avec les
+    // tactiques non mesurées ferait baisser la note à mesure qu'on découvre
+    // l'étendue du référentiel, ce qui n'a aucun sens.
+    const average = notes.length
+        ? (sum / notes.length).toFixed(1).replace(".", ",")
+        : "—";
+
+    const label = reels
+        ? `Rosace de maturité : niveau atteint sur les ${noms.length} tactiques d'ATT&CK Enterprise`
+        : `Rosace d'exemple : niveau de maturité sur les ${noms.length} tactiques d'ATT&CK Enterprise`;
 
     // Le viewBox est plus large que le dessin, de `marge` de chaque côté : c'est
     // la couronne où s'écrivent les noms. Il déborde aussi un peu en hauteur, un
@@ -154,8 +177,7 @@ export function rosace(data) {
 
     return `
         <figure class="rosace-figure">
-            <svg class="rosace" viewBox="${vb}" role="img"
-                 aria-label="Rosace d'exemple : niveau de maturité sur les ${noms.length} tactiques d'ATT&amp;CK Enterprise">
+            <svg class="rosace" viewBox="${vb}" role="img" aria-label="${esc(label)}">
                 <g class="ros-web-group">${spokes}${webs}</g>
                 <polygon class="ros-shape" points="${shape}" style="--tour:${perimeter.toFixed(0)}"/>
                 <g class="ros-dots">${vertices}</g>

@@ -186,6 +186,33 @@ function aggregate(values, mode = "average") {
 }
 
 /**
+ * Niveau moyen de chaque tactique, pour la rosace du tableau de bord.
+ *
+ * Par tactique et non par mitigation : c'est l'axe de lecture d'ATT&CK, celui
+ * de la matrice, et celui de la question qu'on se pose devant elle — « où
+ * sommes-nous faibles ? » se répond en phases d'attaque.
+ *
+ * Une tactique dont aucune technique n'est notée vaut `null` et non zéro : rien
+ * n'a été évalué, ce qui ne veut pas dire que rien n'est en place. Le tracé la
+ * pose au centre, mais elle ne pèse pas sur la moyenne.
+ *
+ * @returns {Map<string, number|null>} indexée par `shortname` de tactique
+ */
+export function tacticLevels(data, scores) {
+    const out = new Map();
+    for (const tactic of data.tactics) {
+        const notes = (data.byTactic.get(tactic.shortname) ?? [])
+            .map(tech => scores.get(tech.id))
+            .filter(cell => cell?.state === CELL_STATE.SCORED)
+            .map(cell => cell.score);
+        out.set(tactic.shortname, notes.length
+            ? notes.reduce((a, b) => a + b, 0) / notes.length
+            : null);
+    }
+    return out;
+}
+
+/**
  * Niveau de chaque mitigation dont le questionnaire a été entamé.
  *
  * On parcourt le catalogue et non les réponses enregistrées : une mitigation
