@@ -94,7 +94,8 @@ const dom = new JSDOM(html, { url: "http://localhost/", pretendToBeVisual: true 
 const { window } = dom;
 
 for (const key of ["window", "document", "HTMLElement", "Node", "Event", "CustomEvent",
-                   "getComputedStyle", "requestAnimationFrame", "localStorage", "Blob", "File", "FileReader"]) {
+                   "getComputedStyle", "requestAnimationFrame", "localStorage", "Blob", "File", "FileReader",
+                   "XMLSerializer"]) {
     try { globalThis[key] = window[key]; } catch { /* propriété en lecture seule dans node */ }
 }
 /* jsdom 26.1 n'implémente ni `Blob.text()` ni `Blob.arrayBuffer()` — ni sur un
@@ -2659,6 +2660,42 @@ console.log("\n[35c] Le tableau de bord");
     autre.dispatchEvent(new window.Event("change"));
     ok("changer de méthode de notation les redessine",
        window.document.querySelector("#dash-rosace .rosace") !== avant);
+
+    /* --- exporter la rosace --- */
+
+    const { rosaceAutonome } = await import(`${ROOT}/js/views/home-visuals.js`);
+    window.document.querySelector('[data-expand="rosace"]').click();
+    ok("l'export n'est proposé que sur la rosace agrandie",
+       /#dash\[data-expanded="rosace"\] \.rosace-export\s*\{\s*display:\s*inline-flex/.test(matrixCss) &&
+       /\.rosace-export\s*\{[^}]*display:\s*none/.test(matrixCss));
+
+    const fichier = rosaceAutonome(window.document.querySelector("#dash-rosace .rosace"));
+    ok("le fichier est un document SVG complet",
+       fichier.startsWith("<?xml") && /xmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(fichier));
+    // Un `xmlns` posé à la main sur un élément déjà dans l'espace de noms SVG
+    // s'ajoute à celui du sérialiseur : deux attributs de même nom, donc un XML
+    // que rien n'ouvre.
+    ok("son espace de noms n'est pas déclaré deux fois",
+       (fichier.match(/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/g) ?? []).length === 1);
+    ok("il se relit comme du XML valide", (() => {
+        const relu = new window.DOMParser().parseFromString(fichier, "image/svg+xml");
+        return !relu.querySelector("parsererror");
+    })());
+    // Une propriété que le navigateur ne résout pas rend une chaîne vide :
+    // l'écrire donnerait « fill:; », que rien ne relit.
+    ok("aucune déclaration vide ne traîne dans les styles", !/[a-z-]+:;/.test(fichier),
+       (/[a-z-]+:;/.exec(fichier) ?? [])[0]);
+    // Le tracé se dessine par `stroke-dashoffset` : une copie prise pendant
+    // l'animation sortirait à moitié faite.
+    ok("le tracé n'y est pas figé au milieu de son animation",
+       !/stroke-dashoffset/.test(fichier) && !/stroke-dasharray/.test(fichier));
+    // Un fond transparent laisserait le dessin disparaître sur une page de sa
+    // teinte — c'est ce que rendent `transparent` et `rgba(…, 0)`.
+    ok("le fond est peint, et jamais transparent",
+       /<rect[^>]*fill="(?!transparent)[^"]+"/.test(fichier) &&
+       !/<rect[^>]*fill="[^"]*,\s*0\)"/.test(fichier),
+       (/<rect[^>]*fill="([^"]*)"/.exec(fichier) ?? [])[1]);
+    window.document.querySelector('[data-expand="rosace"]').click();
 
     /* --- la recherche CVE, prévue mais pas branchée --- */
 

@@ -40,6 +40,10 @@ const app = {
         // l'avancement — l'information qu'on regarde vraiment.
         $("#version-badge")?.classList.toggle("hidden", name !== "home" || !this.data);
 
+        // Questionnaire et Exporter sont montés par la vue matrice, qui seule
+        // sait les câbler. Ailleurs, ils désigneraient l'écran qu'on regarde.
+        if (name !== "matrix") $("#topbar-actions")?.classList.add("hidden");
+
         if (name === "home") renderHome(this);
         if (name === "matrix") renderMatrix(this);
         if (name === "quiz") renderQuiz(this, options);

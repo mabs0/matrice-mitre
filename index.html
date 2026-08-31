@@ -210,6 +210,15 @@
             <i class="dot"></i><span id="version-text"></span>
         </span>
 
+        <!--
+            Questionnaire et Exporter vivent ici plutôt que dans la barre d'outils
+            de la matrice : ce sont des actions sur le layer, pas des réglages
+            d'affichage. Les laisser en bout de barre d'outils la chargeait, et
+            c'est elle qui passait à la ligne en premier sur un écran étroit.
+            Le script de la vue matrice les remplit et les révèle.
+        -->
+        <div id="topbar-actions" class="hidden"></div>
+
         <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Basculer clair / sombre"
                 aria-label="Basculer entre le thème clair et le thème sombre">☀</button>
     </header>

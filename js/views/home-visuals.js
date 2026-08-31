@@ -22,7 +22,7 @@ import { esc } from "../ui.js";
  * Il y a plus de valeurs que de tactiques : le référentiel en a gagné une en
  * v19 et peut en gagner d'autres, la liste est parcourue de façon cyclique.
  */
-const DEMO_LEVELS = [2, 3, 1, 2, 3, 1, 2, 2, 0, 3, 2, 1, 3, 2, 1, 2, 4, 2];
+const DEMO_LEVELS = [3, 4, 2, 3, 3, 1, 2, 2, 1, 4, 2, 2, 3, 2, 0, 2, 3, 1];
 
 /* --------------------------------------------------------------- la rosace */
 
@@ -31,7 +31,7 @@ const DEMO_LEVELS = [2, 3, 1, 2, 3, 1, 2, 2, 0, 3, 2, 1, 3, 2, 1, 2, 4, 2];
    l'horizontale, seule façon de les lire d'un coup d'œil, et c'est ce qui coûte
    cette place — un nom couché tiendrait dans moins, mais se déchiffrerait la
    tête penchée. Le banc mesure cette marge plutôt que de la supposer. */
-const ROSACE = { size: 320, r0: 30, rMax: 108, marge: 34, ecartLibelle: 9 };
+const ROSACE = { size: 320, r0: 30, rMax: 108, marge: 38, ecartLibelle: 14 };
 
 const polar = (cx, cy, r, deg) => {
     const rad = (deg * Math.PI) / 180;
@@ -96,8 +96,10 @@ export function rosace(data, reels = null) {
     const webs = [1, 2, 3, 4].map(level =>
         `<polygon class="ros-web" points="${webPoints(radiusOf(level))}"/>`).join("");
 
+    // Les graduations sont posées au-dessus du polygone de leur palier, pas
+    // dessus : centrées sur le trait, le chiffre et la toile se recouvraient.
     const ticks = [1, 2, 3, 4].map(level =>
-        `<text class="ros-tick" x="${c + 4}" y="${(c - radiusOf(level)).toFixed(1)}">${level}</text>`).join("");
+        `<text class="ros-tick" x="${c + 4}" y="${(c - radiusOf(level) - 4).toFixed(1)}">${level}</text>`).join("");
 
     // Le nom de la tactique au bout de son rayon, à l'horizontale.
     //
@@ -190,6 +192,77 @@ export function rosace(data, reels = null) {
                 <text class="ros-unit" x="${c}" y="${c + 17}">/ 4</text>
             </svg>
         </figure>`;
+}
+
+/* --------------------------------------------------- exporter la rosace
+
+   La rosace tire toutes ses couleurs de la feuille de style : détachée du
+   document, elle sortirait en noir sur noir. On recopie donc, sur chaque
+   élément du dessin, la valeur effectivement calculée par le navigateur — ce
+   qui fige au passage le thème en cours, clair ou sombre, tel qu'il est à
+   l'écran.
+
+   Les animations sont neutralisées de la même façon : le tracé se dessine par
+   `stroke-dashoffset` et les sommets apparaissent en fondu, si bien qu'une copie
+   prise avant la fin montrerait un dessin à moitié fait. */
+
+/** Propriétés qui portent l'apparence du dessin, et elles seules. */
+const STYLES_EXPORTES = [
+    "fill", "fill-opacity", "stroke", "stroke-width", "stroke-linejoin",
+    "stroke-linecap", "opacity", "font-family", "font-size", "font-weight",
+    "letter-spacing", "text-anchor", "dominant-baseline",
+];
+
+/**
+ * Copie autonome de la rosace, prête à être écrite dans un fichier.
+ * @param {SVGElement} svg la rosace telle qu'affichée
+ * @returns {string} un document SVG complet
+ */
+export function rosaceAutonome(svg) {
+    const clone = svg.cloneNode(true);
+
+    const source = [svg, ...svg.querySelectorAll("*")];
+    const copie = [clone, ...clone.querySelectorAll("*")];
+
+    source.forEach((element, i) => {
+        const calcule = getComputedStyle(element);
+        // Une propriété que le navigateur ne sait pas résoudre rend une chaîne
+        // vide : l'écrire donnerait « fill:; », que rien ne relit.
+        const regles = STYLES_EXPORTES
+            .map(prop => [prop, calcule.getPropertyValue(prop)])
+            .filter(([, valeur]) => valeur)
+            .map(([prop, valeur]) => `${prop}:${valeur}`)
+            .join(";");
+        if (regles) copie[i].setAttribute("style", regles);
+        // Le contour est un tiret qui se déroule : sans ça, une copie prise
+        // pendant l'animation sort tronquée.
+        copie[i].removeAttribute("stroke-dasharray");
+        copie[i].removeAttribute("stroke-dashoffset");
+    });
+
+    // Le fond de la page ne fait pas partie du SVG : sans lui, le fichier est
+    // transparent et le dessin disparaît sur un fond de la même teinte. Un fond
+    // transparent est justement ce que rendent `transparent` et `rgba(…, 0)` —
+    // on retombe alors sur du blanc, sur lequel les deux thèmes se lisent.
+    const peinture = getComputedStyle(document.body).backgroundColor;
+    const fond = !peinture || /transparent|,\s*0\s*\)$/.test(peinture) ? "#ffffff" : peinture;
+
+    const [x, y, w, h] = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", w);
+    rect.setAttribute("height", h);
+    rect.setAttribute("fill", fond);
+    clone.insertBefore(rect, clone.firstChild);
+
+    // Pas de `setAttribute("xmlns", …)` : l'élément est déjà dans l'espace de
+    // noms SVG, le sérialiseur l'écrit de lui-même, et le poser à la main
+    // produisait un attribut en double — donc un XML que rien n'ouvre.
+    clone.setAttribute("width", w);
+    clone.setAttribute("height", h);
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}`;
 }
 
 /* ------------------------------------------------- la matrice en arrière-plan */

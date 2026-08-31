@@ -17,12 +17,12 @@
    Evasion en Stealth et Defense Impairment en v19 ajoute simplement une colonne.
    ========================================================================= */
 
-import { esc, $, $$, toast, openModal, closeModal } from "../ui.js";
+import { esc, $, $$, toast, openModal, closeModal, download } from "../ui.js";
 import { LEVEL_LABELS, LEVEL_DEFINITIONS, getQuestionnaire, QUESTIONNAIRES } from "../catalog.js";
 import { resolvedEntries } from "../shared-questions.js";
 import { buildMatrixScores, mitigationLevels, tacticLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
 import { exportExcel, exportJSON, exportName } from "../io.js";
-import { rosace } from "./home-visuals.js";
+import { rosace, rosaceAutonome } from "./home-visuals.js";
 
 /** État de vue, volontairement hors du layer : ce n'est pas de la donnée d'évaluation. */
 const view = {
@@ -60,7 +60,14 @@ export function renderMatrix(app) {
         <div id="dash" ${view.expanded ? `data-expanded="${view.expanded}"` : ""}>
             <div id="dash-side">
                 <section class="dash-panel" data-panel="rosace">
-                    <div class="panel-head"><h2>Maturité par tactique</h2>${expandButton("rosace")}</div>
+                    <div class="panel-head">
+                        <h2>Maturité par tactique</h2>
+                        <!-- L'export n'a de sens qu'en grand : c'est là qu'on
+                             regarde la rosace pour ce qu'elle vaut, et qu'on a
+                             envie de l'emporter dans une présentation. -->
+                        <button class="btn btn-sm rosace-export" id="rosace-export">Exporter</button>
+                        ${expandButton("rosace")}
+                    </div>
                     <div class="panel-body" id="dash-rosace"></div>
                 </section>
 
@@ -111,18 +118,21 @@ export function renderMatrix(app) {
 
                     <div id="matrix-legend"></div>
 
-                    <div class="tool-sep"></div>
-
-                    <button class="btn btn-sm" id="matrix-quiz">Questionnaire</button>
-                    <div class="dropdown" id="dd-export">
-                        <button class="btn btn-sm btn-primary" id="dd-export-btn">Exporter</button>
-                        <div class="dropdown-panel" id="export-panel" style="min-width:280px;"></div>
-                    </div>
                     ${expandButton("matrix")}
                 </div>
 
                 <div id="matrix-wrapper"><div id="matrix-grid"></div></div>
             </section>
+        </div>`;
+
+    // Les actions sur le layer sont montées dans la barre haute, pas ici.
+    const actions = $("#topbar-actions");
+    actions.classList.remove("hidden");
+    actions.innerHTML = `
+        <button class="btn btn-sm" id="matrix-quiz">Questionnaire</button>
+        <div class="dropdown" id="dd-export">
+            <button class="btn btn-sm btn-primary" id="dd-export-btn">Exporter</button>
+            <div class="dropdown-panel" id="export-panel" style="min-width:280px;"></div>
         </div>`;
 
     buildLegend();
@@ -137,6 +147,7 @@ export function renderMatrix(app) {
     for (const button of $$("[data-expand]")) {
         button.onclick = () => toggleExpand(app, button.dataset.expand);
     }
+    $("#rosace-export").onclick = () => exporterRosace(app);
 
     for (const id of ["platform", "method", "export"]) {
         $(`#dd-${id}-btn`).onclick = e => {
@@ -385,7 +396,7 @@ function paint(app) {
     grid.classList.toggle("fit", plein);
     grid.style.gridTemplateColumns = plein
         ? `repeat(${data.tactics.length}, minmax(0, 1fr))`
-        : `repeat(${data.tactics.length}, minmax(112px, 1fr))`;
+        : `repeat(${data.tactics.length}, minmax(96px, 1fr))`;
     grid.innerHTML = "";
 
     let visibleTotal = 0;
@@ -446,6 +457,23 @@ const matchesPlatform = tech =>
    tracé sous les doigts du répondant. Or filtrer la matrice ne change aucune
    note — seuls une réponse au questionnaire et un changement de méthode de
    notation le font. */
+
+/**
+ * Écrit la rosace dans un fichier SVG.
+ *
+ * SVG plutôt qu'une image de pixels : le dessin reste net à toutes les tailles,
+ * ce qui compte pour une figure destinée à une présentation ou à un rapport, et
+ * le format s'ouvre dans un navigateur comme il s'insère dans un document. Le
+ * fichier est autonome — les couleurs du thème en cours y sont figées.
+ */
+function exporterRosace(app) {
+    const svg = $("#dash-rosace .rosace");
+    if (!svg) return;
+
+    const nom = `${exportName(app.layer)}-rosace.svg`;
+    download(nom, new Blob([rosaceAutonome(svg)], { type: "image/svg+xml" }));
+    toast(`${nom} exporté.`);
+}
 
 /** Les deux panneaux qui dépendent des notes. */
 function paintSide(app) {

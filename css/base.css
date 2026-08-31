@@ -84,6 +84,9 @@ body {
 
 .spacer { flex: 1 1 auto; }
 
+/* Actions sur le layer, montées par la vue matrice. */
+#topbar-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+
 .version-badge {
     display: inline-flex;
     align-items: center;
@@ -133,7 +136,8 @@ button { font-family: inherit; }
 
 /* --------------------------------------------------------- champs de saisie */
 
-input[type="text"], input[type="password"], input[type="email"], select, textarea {
+input[type="text"], input[type="password"], input[type="email"], input[type="search"],
+select, textarea {
     font-family: inherit;
     font-size: 0.8rem;
     padding: 7px 10px;
@@ -142,6 +146,9 @@ input[type="text"], input[type="password"], input[type="email"], select, textare
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
 }
+/* La poignée de redimensionnement laisse déformer la boîte, et la pastille en
+   bas à droite se voit. La hauteur est déjà réglée pour le contenu. */
+textarea { resize: none; line-height: 1.5; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;

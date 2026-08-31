@@ -8,7 +8,7 @@
     width: 100%;
     max-width: 1040px;
     margin: 0 auto;
-    padding: 40px 24px 64px;
+    padding: 24px 24px 64px;
 }
 
 /* ------------------------------------------- matrice d'exemple en arrière-plan
@@ -93,14 +93,17 @@
    place quand l'écran est bas — sa hauteur est bornée en `vh` —, jamais les
    cartes, qui sont ce pour quoi on est venu. */
 
+/* La hauteur disponible, une fois la barre haute et la marge du haut retirées.
+   Les deux cartes doivent tenir dedans avec le titre et la rosace : c'est la
+   rosace qui rend la place quand l'écran est bas, jamais les cartes. */
 .home-first {
-    min-height: calc(100dvh - 48px - 40px);   /* barre haute, marge haute de .home-inner */
+    min-height: calc(100dvh - 48px - 24px);
     display: flex;
     flex-direction: column;
     /* Cale vers le haut plutôt qu'au centre : la hauteur ainsi récupérée revient
        à la rosace, qui est ce qu'on vient regarder. */
     justify-content: flex-start;
-    gap: clamp(14px, 2.4vh, 26px);
+    gap: clamp(10px, 1.6vh, 18px);
 }
 
 .home-hero {
@@ -108,7 +111,7 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: clamp(6px, 1vh, 12px);
+    gap: clamp(4px, 0.8vh, 10px);
 }
 
 /* Fréquentation, à la place du bandeau de version — lequel redisait le badge de
@@ -159,10 +162,14 @@
    `max-width: 100%` seul ne suffit pas : quand la largeur bride une image de
    hauteur fixe, la hauteur ne suit pas et le dessin se déforme. `height: auto`
    au-delà d'un certain rapport largeur/hauteur rend la main à la largeur. */
+/* Le facteur en `vh` est ce qui décide que les deux cartes tiennent sous la
+   ligne de flottaison. Mesuré : titre sur deux lignes (~88 px), accroche sur
+   trois (~71 px), cartes (~224 px) et les interlignes laissent environ 40 % de
+   la hauteur à la rosace. Au-delà, les cartes passent sous le pli. */
 .rosace {
     display: block;
     margin: 0 auto;
-    height: clamp(220px, 46vh, 520px);
+    height: clamp(190px, 40vh, 500px);
     width: auto;
     max-width: 100%;
     overflow: visible;
@@ -283,7 +290,7 @@
    et la rosace au-dessus. Plutôt que de tout comprimer jusqu'à l'illisible, on
    rend la hauteur libre : le défilement redevient normal, et c'est la rosace qui
    part la première puisqu'elle n'est qu'un exemple. */
-@media (max-width: 700px), (max-height: 620px) {
+@media (max-width: 700px), (max-height: 700px) {
     .home-first { min-height: 0; gap: 24px; }
 }
 
