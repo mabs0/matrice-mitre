@@ -14,7 +14,7 @@
 
 import { ANSWERS, LEVEL_LABELS } from "./catalog.js";
 import { resolvedEntries } from "./shared-questions.js";
-import { createLayer, sanitiseAnswers } from "./layer.js";
+import { createLayer, sanitiseAnswers, MITIGATION_ID } from "./layer.js";
 import { CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "./scoring.js";
 
 const RESPONSE_SHEET = "Réponses";
@@ -600,7 +600,11 @@ export function readWorkbook(wb, { name } = {}) {
         const id = lire("Mitigation");
         const num = Number(lireParmi("N°", "Numéro"));
         const value = lire("Réponse");
-        if (!id || !num || !ANSWERS.includes(value)) continue;
+        // L'identifiant vient d'une cellule, donc de quelqu'un : il est reconnu
+        // avant de servir de clé. Une cellule contenant `__proto__` aurait écrit
+        // la réponse sur le prototype de tous les objets de la page, et non dans
+        // le layer. Voir `MITIGATION_ID` dans layer.js.
+        if (!MITIGATION_ID.test(id) || !num || !ANSWERS.includes(value)) continue;
         (layer.answers[id] ??= {})[num] = {
             value,
             tool: lire("Outil (si applicable)"),
@@ -650,10 +654,13 @@ function lireMetadonnees(wb, layer) {
     };
     // Un mode inconnu — cellule retouchée, classeur d'une version ultérieure —
     // laisserait la matrice sans notation : on garde alors celui par défaut.
+    // `Object.hasOwn` et non `in` : `in` suit la chaîne de prototypes, si bien
+    // qu'une cellule contenant « toString » ou « constructor » passait pour un
+    // mode de notation valide.
     const scoring = valeurs.get("Mode de notation");
-    if (scoring && scoring in SCORING_MODES) layer.scoring = scoring;
+    if (scoring && Object.hasOwn(SCORING_MODES, scoring)) layer.scoring = scoring;
     const aggregation = valeurs.get("Mode d'agrégation");
-    if (aggregation && aggregation in AGGREGATION_MODES) layer.aggregation = aggregation;
+    if (aggregation && Object.hasOwn(AGGREGATION_MODES, aggregation)) layer.aggregation = aggregation;
 }
 
 /**
@@ -675,6 +682,12 @@ function texte(valeur) {
 /* ------------------------------------------------- chargement à la demande */
 
 const CDN = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+/* Empreinte publiée par cdnjs pour cette version exacte. Le navigateur refuse
+   d'exécuter un fichier qui ne lui correspond pas : un CDN compromis, ou un
+   intermédiaire qui réécrit le trafic, n'obtient pas l'exécution de son script
+   dans une page qui manipule des évaluations de sécurité. À reprendre à chaque
+   changement de version — une empreinte périmée bloque le chargement. */
+const CDN_EMPREINTE = "sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==";
 let chargement = null;
 
 /**
@@ -689,6 +702,11 @@ export function loadExcel() {
     chargement ??= new Promise((resolve, reject) => {
         const s = document.createElement("script");
         s.src = CDN;
+        s.integrity = CDN_EMPREINTE;
+        // Sans requête inter-origine explicite, la réponse est opaque et
+        // l'empreinte ne peut pas être calculée : le contrôle serait ignoré.
+        s.crossOrigin = "anonymous";
+        s.referrerPolicy = "no-referrer";
         s.onload = () => globalThis.ExcelJS
             ? resolve(globalThis.ExcelJS)
             : reject(new Error("bibliothèque Excel chargée mais introuvable"));

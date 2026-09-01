@@ -141,20 +141,29 @@
 
 /* --------------------------------------------- liste des mitigations notées */
 
-.mit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Une seule déclaration pour `.mit-list` et `.mit-row`.
+
+   Elles étaient écrites deux fois dans ce fichier — une fois ici pour la liste
+   du tableau de bord, une fois plus bas pour celle de la modale d'une technique.
+   Deux sélecteurs de classe de même spécificité : c'était le second qui gagnait,
+   et les lignes du tableau de bord prenaient en réalité l'habillage de la
+   modale, sans que rien ne le dise. La règle ci-dessous est le résultat effectif
+   de cette cascade, écrit une bonne fois — le rendu est inchangé, mais il n'y a
+   plus qu'un endroit à toucher pour le faire changer. */
+.mit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 
 .mit-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     width: 100%;
-    padding: 5px 6px;
-    background: none;
-    border: 1px solid transparent;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text);
     font-family: inherit;
-    font-size: 0.74rem;
+    font-size: 0.75rem;
     text-align: left;
     cursor: pointer;
 }
@@ -352,8 +361,8 @@
 .cell, .tactic-head { overflow-wrap: break-word; }
 
 /* Plein écran : la grille tient dans la largeur, sans défilement horizontal.
-   `min-width: max-content` l'en empêchait — c'est lui qui impose la largeur du
-   plus long libellé. On le lève, et les textes passent à la ligne. */
+   Même `min-content` réserve la largeur du plus long mot de chaque colonne ; on
+   lève tout plancher, et les textes passent à la ligne. */
 #matrix-grid.fit { min-width: 0; }
 /* Les mots se coupent aux espaces, et seulement là.
    `overflow-wrap: anywhere` avec `hyphens: auto` découpait à l'intérieur des
@@ -551,17 +560,7 @@
 .panel-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
 .panel-cols h4 { margin: 0 0 9px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); }
 
-.mit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.mit-row {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 10px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-}
+/* Forme commune aux deux listes : voir `.mit-row` plus haut. */
 .mit-row .m-id { font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 
 /* C'est le nom qui cède, jamais l'action. Un nom long comme « Restrict File and
@@ -634,9 +633,10 @@
 
 /* ------------------------------------------------------------ écrans étroits
 
-   La grille garde ses colonnes à 146 px et défile horizontalement dans son
-   enveloppe : c'est le comportement voulu, une matrice à quinze tactiques ne se
-   replie pas. Ce qui doit s'adapter, c'est tout ce qui l'entoure. */
+   La grille garde le plancher de colonne fixé par le script et défile
+   horizontalement dans son enveloppe : c'est le comportement voulu, une matrice
+   à quinze tactiques ne se replie pas. Ce qui doit s'adapter, c'est tout ce qui
+   l'entoure. */
 @media (max-width: 560px) {
     #matrix-toolbar { gap: 7px; padding: 8px 10px; }
     #matrix-search { width: 150px; }

@@ -100,9 +100,6 @@ function dropUnreachable(layer, mitigationId, num) {
     return dropped;
 }
 
-export const answerOf = (layer, mitigationId, num) =>
-    resolvedEntries(layer, mitigationId)[num]?.value ?? null;
-
 /* ------------------------------------------------------------- avancement */
 
 /**
@@ -110,8 +107,8 @@ export const answerOf = (layer, mitigationId, num) =>
  * clôt la mitigation, donc on n'attend pas que les questions suivantes soient
  * répondues pour la considérer traitée.
  *
- * @returns {{answered: number, reached: number, complete: boolean,
- *            nextNum: number|null, touched: boolean}}
+ * @returns {{answered: number, complete: boolean, nextNum: number|null,
+ *            blockedAt: number|null}}
  */
 export function questionnaireState(questionnaire, entries = {}) {
     let answered = 0;
@@ -129,15 +126,7 @@ export function questionnaireState(questionnaire, entries = {}) {
         if (i === questionnaire.questions.length - 1) complete = true;        // fin du parcours
     }
 
-    return {
-        answered,
-        // Le dénominateur utile est le nombre de questions effectivement atteintes.
-        reached: complete ? answered : answered + 1,
-        complete,
-        nextNum,
-        blockedAt,
-        touched: answered > 0,
-    };
+    return { answered, complete, nextNum, blockedAt };
 }
 
 /**
@@ -186,7 +175,6 @@ export function progress(layer) {
         questions,                                  // questions du catalogue
         mitigations,
         completeMitigations: done,
-        startedMitigations: [...per.values()].filter(p => p.engaged).length,
         pct: mitigations ? Math.round((done / mitigations) * 100) : 0,
         complete: mitigations > 0 && done === mitigations,
     };
@@ -276,6 +264,21 @@ function hydrate(raw) {
     return layer;
 }
 
+/* Forme des clés acceptées dans `answers`.
+
+   Un identifiant de mitigation ATT&CK s'écrit « M » suivi de quatre chiffres, un
+   numéro de question est un entier. Tout le reste est écarté **avant** de servir
+   d'index, et ce n'est pas une précaution de style : un fichier de layer se
+   fabrique à la main, et une clé `__proto__` dans `answers` n'aurait pas rempli
+   le layer — `out["__proto__"] ??= {}` ne crée rien, la lecture rendant déjà
+   `Object.prototype`, et l'écriture suivante serait allée poser la réponse sur
+   le prototype de tous les objets de la page. L'application aurait ensuite lu
+   cette réponse partout où elle interroge un objet vide, c'est-à-dire dans toute
+   mitigation sans réponse propre : des « Oui » inventés dans la matrice, et
+   réexportés comme s'ils avaient été donnés. */
+export const MITIGATION_ID = /^M\d{4}$/;
+const NUMERO = /^\d+$/;
+
 /**
  * Ne garde que des réponses reconnues, pour ne pas propager un fichier abîmé,
  * et ramène chaque question commune chez son porteur.
@@ -287,9 +290,12 @@ function hydrate(raw) {
 export function sanitiseAnswers(answers) {
     const out = {};
     for (const [mitigationId, entries] of Object.entries(answers || {})) {
+        // Une clé venue du fichier ne sert d'index qu'après avoir été reconnue.
+        if (!MITIGATION_ID.test(mitigationId)) continue;
         if (!entries || typeof entries !== "object") continue;
         const questionnaire = QUESTIONNAIRES.get(mitigationId);
         for (const [num, entry] of Object.entries(entries)) {
+            if (!NUMERO.test(num)) continue;
             const value = typeof entry === "string" ? entry : entry?.value;
             if (!ANSWERS.includes(value)) continue;
             // Une réponse à une question qui n'existe pas fausserait la note.

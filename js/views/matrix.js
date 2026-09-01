@@ -618,6 +618,12 @@ function cellFor(app, tech, scores, query, highlighted, isSub = false) {
 
 const formatScore = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
 
+/* L'URL de la fiche vient du bundle ATT&CK, donc d'un fichier téléchargé, et
+   elle finit dans un `href`. L'échappement HTML ne dit rien du schéma : il
+   laisserait passer un `javascript:…` tel quel. On n'accepte donc que le web,
+   et à défaut le lien n'est pas proposé plutôt que d'être proposé faux. */
+const lienWeb = url => (/^https?:\/\//i.test(String(url ?? "")) ? String(url) : "");
+
 /* ------------------------------------------------- modale d'une technique */
 
 function openTechnique(app, tech, scores) {
@@ -713,7 +719,10 @@ function openTechnique(app, tech, scores) {
 
             <div class="panel-foot">
                 <span class="grow">ATT&amp;CK Enterprise v${esc(data.version)}</span>
-                <a class="btn btn-sm" href="${esc(tech.url)}" target="_blank" rel="noopener">Fiche MITRE ↗</a>
+                ${lienWeb(tech.url)
+                    ? `<a class="btn btn-sm" href="${esc(lienWeb(tech.url))}" target="_blank"
+                         rel="noopener noreferrer">Fiche MITRE ↗</a>`
+                    : ""}
             </div>
         </div>`, { wide: true });
 

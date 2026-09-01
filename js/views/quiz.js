@@ -231,8 +231,7 @@ function paint(app) {
                  échelles chiffrées au-dessus de la barre disaient ce qu'elle
                  montre déjà. Il reste porté ici, pour le banc d'essai et pour
                  qui inspecte la page. -->
-            <div class="quiz-card level-${question.level}"
-                 data-question="${cursor.index + 1}" data-total="${total}">
+            <div class="quiz-card" data-question="${cursor.index + 1}" data-total="${total}">
                 <p class="quiz-question">${esc(texte)}</p>
 
                 <div class="quiz-answers">

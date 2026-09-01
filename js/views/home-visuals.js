@@ -291,7 +291,6 @@ const BACKDROP = {
     header: 26,        // hauteur de l'en-tête de tactique
     maxRows: 28,       // les tactiques les plus fournies sont écrêtées
     repeats: 2,        // blocs de matrice côte à côte dans une trame
-    bands: 1,
     /* Plancher de largeur à couvrir. La largeur réelle est celle de la fenêtre,
        ce plancher lui laissant de la marge pour une rotation ou un
        redimensionnement — le fond n'est pas recomposé à chaque resize. Le nombre
@@ -304,7 +303,7 @@ const BACKDROP = {
 };
 
 /** Durée de défilement. Lente : le fond doit vivre, pas attirer l'œil. */
-const BAND_DURATIONS = [190];
+const DUREE = 190;
 
 /**
  * Générateur déterministe. Deux rendus successifs doivent donner exactement la
@@ -334,7 +333,7 @@ function seeded(seed) {
  * document ne porte les rectangles qu'une seule fois.
  */
 export function matrixBackdrop(data) {
-    const { cellW, cellH, gap, header, maxRows, repeats, bands } = BACKDROP;
+    const { cellW, cellH, gap, header, maxRows, repeats } = BACKDROP;
     const pitchX = cellW + gap;
     const pitchY = cellH + gap;
 
@@ -383,28 +382,18 @@ export function matrixBackdrop(data) {
     const copyCount = Math.max(2, Math.ceil(cover / width) + 1);
     const totalWidth = copyCount * width;
 
-    // Chaque bande est un élément **HTML**, pas un groupe SVG.
+    // La bande est un élément **HTML**, pas un groupe SVG.
     //
     // Ce n'est pas un détail de forme : WebKit n'anime pas de façon fiable une
     // transformation CSS posée sur un élément interne d'un SVG. Le fond restait
     // parfaitement immobile sur iOS quand il défilait sur Chrome. Translater un
     // `div` est en revanche le cas le mieux accéléré qui existe, partout.
-    const strips = Array.from({ length: bands }, (_, b) => {
-        const duration = BAND_DURATIONS[b % BAND_DURATIONS.length];
-
-        // Deux bandes voisines ne doivent pas montrer la même découpe au même
-        // moment. Le décalage est pris sur la **phase** de l'animation, par un
-        // délai négatif, et non sur la position des copies : déplacer les copies
-        // rognerait la couverture d'un côté ou de l'autre.
-        const phase = -((b * duration) / bands).toFixed(1);
-
-        const copies = Array.from({ length: copyCount }, (_, i) =>
-            `<use href="#bd-tiles" x="${i * width}" y="0"/>`).join("");
-        return `<div class="bd-band" style="--dur:${duration}s;--phase:${phase}s">
-            <svg width="${totalWidth}" height="${bandHeight}"
-                 viewBox="0 0 ${totalWidth} ${bandHeight}">${copies}</svg>
-        </div>`;
-    }).join("");
+    const copies = Array.from({ length: copyCount }, (_, i) =>
+        `<use href="#bd-tiles" x="${i * width}" y="0"/>`).join("");
+    const strip = `<div class="bd-band" style="--dur:${DUREE}s">
+        <svg width="${totalWidth}" height="${bandHeight}"
+             viewBox="0 0 ${totalWidth} ${bandHeight}">${copies}</svg>
+    </div>`;
 
     // `--trame` est l'amplitude du défilement : le CSS anime de cette largeur
     // exactement, sans avoir à connaître la géométrie décrite ici.
@@ -418,6 +407,6 @@ export function matrixBackdrop(data) {
             <svg class="bd-defs" width="0" height="0" aria-hidden="true" focusable="false">
                 <defs><g id="bd-tiles">${parts.join("")}</g></defs>
             </svg>
-            ${strips}
+            ${strip}
         </div>`;
 }

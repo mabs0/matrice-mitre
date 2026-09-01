@@ -101,7 +101,25 @@
     })();
     </script>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!--
+        La bibliothèque de chiffrement, avec son empreinte.
+
+        `integrity` fait vérifier au navigateur que l'octet reçu est bien celui
+        attendu : sans elle, un CDN compromis — ou un intermédiaire qui réécrit le
+        trafic — injecte le script de son choix dans une page qui manipule des
+        évaluations de sécurité et la clé qui les chiffre, et rien ne le signale.
+        `crossorigin` est indispensable au contrôle : sans lui la réponse est
+        opaque et l'empreinte ne peut pas être calculée.
+
+        L'empreinte est celle publiée par cdnjs pour cette version exacte ; elle
+        change à chaque changement de version, et il faut donc la reprendre là.
+        Version 4.2.0 : c'est celle contre laquelle le banc d'essai tourne, et le
+        format des fichiers déjà chiffrés est inchangé — vérifié dans les deux
+        sens, un export de la 4.1.1 se relit et réciproquement.
+    -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"
+            integrity="sha512-a+SUDuwNzXDvz4XrIcXHuCf089/iJAoN4lmrXJg18XnduKK6YlDHNRalv4yd1N40OKI80tFidF+rqTFKGPoWFQ=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <!--
         La bibliothèque Excel n'est pas chargée ici : elle pèse 250 Ko et ne sert
         qu'à l'export et à l'import, jamais au démarrage. `js/excel.js` l'appelle

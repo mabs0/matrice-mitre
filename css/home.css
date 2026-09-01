@@ -66,16 +66,15 @@
 
 /* La bande part d'une trame vers la gauche et remonte à zéro : le défilement se
    fait donc vers la droite, et translater d'exactement une trame ramène au point
-   de départ, d'où la boucle sans couture. `--trame` est posée par le markup, la
-   géométrie n'est pas redite ici. `--phase` est un délai négatif : il place
-   chaque bande à un endroit différent du même cycle. */
+   de départ, d'où la boucle sans couture. `--trame` et `--dur` sont posées par le
+   markup, la géométrie n'est pas redite ici. */
 /* Une bande est un élément HTML et non un groupe SVG : WebKit — donc tout
    navigateur sur iOS, Firefox compris — n'anime pas de façon fiable une
    transformation CSS posée à l'intérieur d'un SVG. Le fond restait immobile sur
    iPhone quand il défilait sur Chrome. */
 .bd-band {
     flex: none;
-    animation: bd-slide var(--dur, 110s) linear var(--phase, 0s) infinite;
+    animation: bd-slide var(--dur, 110s) linear infinite;
     will-change: transform;
 }
 @keyframes bd-slide {
@@ -481,9 +480,8 @@
     text-align: center;
 }
 
-/* --------------------------------------------------- formulaire de reprise */
+/* ------------------------------------------------------- champs des modales */
 
-.field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field input { width: 100%; }
 .field .help { font-size: 0.68rem; color: var(--text-mute); }

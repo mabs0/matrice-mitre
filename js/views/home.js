@@ -239,7 +239,7 @@ function readEncrypted(file) {
             <div class="modal-head">
                 <h3 style="margin:0;font-size:1.02rem;">Fichier chiffré</h3>
                 <p style="margin:6px 0 0;font-size:0.76rem;color:var(--text-dim);line-height:1.5;">
-                    « ${esc(file.name) }» a été exporté avec une clé. Saisissez-la pour l'ouvrir.
+                    « ${esc(file.name)} » a été exporté avec une clé. Saisissez-la pour l'ouvrir.
                 </p>
             </div>
             <div class="modal-body">

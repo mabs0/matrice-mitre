@@ -2860,5 +2860,111 @@ console.log("\n[36] Un téléchargement qui échoue est retenté");
        `${durable.essais.length} essais`);
 }
 
+console.log("\n[37] Ce qui vient d'un fichier ne devient jamais une clé sans être reconnu");
+{
+    const { sanitiseAnswers } = await import(`${ROOT}/js/layer.js`);
+
+    /* Un layer se transporte par fichier, et un fichier se fabrique à la main.
+
+       `out[id] ??= {}` sur une clé `__proto__` ne crée rien — la lecture rend
+       déjà `Object.prototype`, qui n'est ni null ni undefined — et l'écriture
+       suivante allait poser la réponse sur le prototype de tous les objets de la
+       page. Ce n'était pas qu'une curiosité : l'application lit les réponses en
+       interrogeant des objets ordinaires, donc chaque mitigation sans réponse
+       propre se serait mise à en rendre une. Des « Oui » inventés dans la
+       matrice, et réexportés comme s'ils avaient été donnés. */
+    const piege = JSON.parse('{"__proto__":{"1":{"value":"Oui"}}}');
+    const sorti = sanitiseAnswers(piege);
+    ok("une clé « __proto__ » dans les réponses n'atteint pas le prototype",
+       ({}).__proto__ === Object.prototype && ({})["1"] === undefined,
+       JSON.stringify(({})["1"]));
+    ok("et elle ne ressort pas non plus dans le layer",
+       Object.keys(sorti).length === 0, JSON.stringify(sorti));
+
+    // Les identifiants réels continuent de passer : la garde reconnaît, elle ne
+    // rejette pas tout.
+    const bon = sanitiseAnswers({ M1032: { 1: { value: "Oui", tool: "Entra ID" } } });
+    ok("un identifiant de mitigation normal passe toujours",
+       bon.M1032?.[1]?.value === "Oui" && bon.M1032[1].tool === "Entra ID",
+       JSON.stringify(bon));
+    // Un numéro de question doit être un entier : la même écriture sur une clé
+    // `__proto__` pose le prototype de l'objet des réponses d'une mitigation.
+    const numeroTordu = sanitiseAnswers({ M1032: { "__proto__": { value: "Oui" } } });
+    ok("un numéro de question qui n'en est pas un est écarté",
+       Object.keys(numeroTordu).length === 0, JSON.stringify(numeroTordu));
+
+    /* Même porte d'entrée par le classeur : la colonne « Mitigation » est une
+       cellule, donc du texte libre. Elle est écrite avant que `sanitiseAnswers`
+       ne passe, il faut donc la garder là aussi. */
+    const truque = new ExcelJS.Workbook();
+    const feuille = truque.addWorksheet("Réponses");
+    feuille.addRow(["Mitigation", "N°", "Réponse", "Outil (si applicable)"]);
+    feuille.addRow(["__proto__", 1, "Oui", ""]);
+    feuille.addRow(["M1032", 1, "Oui", "Entra ID"]);
+    const reluTruque = readWorkbook(truque, { name: "Truqué" });
+    ok("une cellule « Mitigation » truquée n'atteint pas le prototype non plus",
+       ({})["1"] === undefined && reluTruque.answers.M1032?.[1]?.value === "Oui",
+       JSON.stringify(({})["1"]));
+
+    /* Le mode de notation était cherché avec `in`, qui suit la chaîne de
+       prototypes : une cellule « toString » passait pour un mode valide et
+       laissait la matrice sur une notation qui n'existe pas. */
+    const meta = new ExcelJS.Workbook();
+    const rep = meta.addWorksheet("Réponses");
+    rep.addRow(["Mitigation", "N°", "Réponse"]);
+    rep.addRow(["M1032", 1, "Oui"]);
+    const md = meta.addWorksheet("Métadonnées");
+    md.addRow(["Mode de notation", "toString"]);
+    md.addRow(["Mode d'agrégation", "constructor"]);
+    const reluMeta = readWorkbook(meta, { name: "Méta" });
+    ok("un mode de notation hérité du prototype est refusé",
+       reluMeta.scoring === "last-yes" && reluMeta.aggregation === "average",
+       `${reluMeta.scoring} / ${reluMeta.aggregation}`);
+}
+
+console.log("\n[38] Les bibliothèques du CDN sont vérifiées à la réception");
+{
+    /* Deux scripts viennent d'un CDN, dans une page qui manipule des évaluations
+       de sécurité et la clé qui les chiffre. Sans empreinte, un CDN compromis ou
+       un intermédiaire qui réécrit le trafic obtient l'exécution du script de son
+       choix, et rien ne le signale. */
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    const balises = [...html.matchAll(/<script\b[^>]*\bsrc="(https?:\/\/[^"]+)"[^>]*>/g)];
+    ok("tout script distant du document porte une empreinte",
+       balises.length > 0 && balises.every(([balise]) =>
+           /integrity="sha(256|384|512)-/.test(balise) && /crossorigin=/.test(balise)),
+       balises.map(([b]) => b.slice(0, 60)).join(" | "));
+
+    // Le second est injecté à la demande par excel.js : il doit être vérifié de
+    // la même façon, et `crossorigin` en est la condition — sans lui la réponse
+    // est opaque et l'empreinte ne peut pas être calculée.
+    const excelSrc = readFileSync(`${ROOT}/js/excel.js`, "utf8");
+    ok("la bibliothèque Excel chargée à la demande l'est aussi",
+       /s\.integrity\s*=/.test(excelSrc) && /s\.crossOrigin\s*=\s*"anonymous"/.test(excelSrc));
+    ok("son empreinte est bien celle de la version demandée",
+       /exceljs\/4\.4\.0\//.test(excelSrc) &&
+       excelSrc.includes("sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw=="));
+
+    // La version chargée par le navigateur et celle contre laquelle le banc
+    // tourne doivent être la même, sans quoi les essais de chiffrement ne
+    // disent rien du site.
+    const versionBanc = JSON.parse(
+        readFileSync(`${ROOT}/test/node_modules/crypto-js/package.json`, "utf8")).version;
+    ok("le banc chiffre avec la version que la page charge",
+       html.includes(`crypto-js/${versionBanc}/crypto-js.min.js`), versionBanc);
+}
+
+console.log("\n[39] Une adresse venue du bundle n'entre dans un lien qu'après contrôle");
+{
+    /* Les URL des fiches viennent du bundle ATT&CK, donc d'un fichier
+       téléchargé, et elles finissent dans un `href`. L'échappement HTML ne dit
+       rien du schéma : `javascript:…` en sortirait intact. */
+    const src = readFileSync(`${ROOT}/js/views/matrix.js`, "utf8");
+    ok("l'URL de la fiche MITRE est filtrée sur son schéma avant d'être posée",
+       /href="\$\{esc\(lienWeb\(tech\.url\)\)\}"/.test(src) &&
+       /\^https\?:/.test(src),
+       /href="\$\{esc\(tech\.url\)\}"/.test(src) ? "posée sans contrôle" : "");
+}
+
 console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);
 process.exit(failures ? 1 : 0);

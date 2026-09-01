@@ -103,14 +103,6 @@ export const groupOf = (mitigationId, num) => BY_MEMBER.get(at(mitigationId, num
 /** Le porteur de la réponse : le premier membre déclaré. */
 export const primaryOf = group => group.members[0];
 
-/** Vrai si cette question est portée par une autre mitigation que celle-ci. */
-export function isBorrowed(mitigationId, num) {
-    const group = groupOf(mitigationId, num);
-    if (!group) return false;
-    const primary = primaryOf(group);
-    return primary.mitigation !== mitigationId || String(primary.question) !== String(num);
-}
-
 /** Formulation commune à retenir, ou null si les membres sont déjà identiques. */
 export function sharedText(mitigationId, num) {
     return groupOf(mitigationId, num)?.text ?? null;
