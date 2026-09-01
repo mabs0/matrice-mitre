@@ -341,16 +341,24 @@ function buildExportPanel(app) {
             : "Le fichier sortira en clair : lisible par quiconque y a accès.";
     };
 
-    $("#ex-json").onclick = () => {
+    $("#ex-json").onclick = async () => {
         const passphrase = crypt.checked ? $("#ex-pass").value : "";
         if (crypt.checked && !passphrase) {
             toast("Saisissez une clé, ou décochez le chiffrement.", "error");
             return;
         }
-        exportJSON(app.layer, passphrase);
         $("#dd-export").classList.remove("open");
-        toast(`${exportName(app.layer)}${passphrase ? "-chiffre" : ""}.json exporté`
-            + `${passphrase ? "" : " — en clair"}.`);
+        // Dériver la clé coûte 600 000 itérations — quelques dixièmes de
+        // seconde. C'est ce qui rend le fichier coûteux à attaquer, mais il faut
+        // le dire : un clic sans réaction se lit comme un clic sans effet.
+        if (passphrase) toast("Chiffrement du fichier…");
+        try {
+            await exportJSON(app.layer, passphrase);
+            toast(`${exportName(app.layer)}${passphrase ? "-chiffre" : ""}.json exporté`
+                + `${passphrase ? "" : " — en clair"}.`);
+        } catch (err) {
+            toast(`Export impossible : ${err.message}`, "error");
+        }
     };
     // L'export Excel attend le chargement de sa bibliothèque : on le dit, plutôt
     // que de laisser croire à un clic sans effet.

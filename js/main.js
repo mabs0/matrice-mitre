@@ -170,7 +170,12 @@ async function boot() {
                    <code>index.html</code> encore en cache avec des scripts déjà rechargés :
                    forcez le rechargement avec <b>Ctrl+Maj+R</b>. Si le message persiste,
                    envoyez-le tel quel.`}</p>
-            <button class="btn btn-primary" onclick="location.reload(true)">Réessayer</button>`;
+            <button class="btn btn-primary" id="boot-retry">Réessayer</button>`;
+        // Câblé ici plutôt qu'en attribut `onclick` : un gestionnaire écrit dans
+        // le markup est du script en ligne, que la politique de sécurité du
+        // document refuse — et à juste titre, c'est la forme qu'emprunte une
+        // injection.
+        $("#boot-retry")?.addEventListener("click", () => location.reload());
         console.error(err);
         return;
     }

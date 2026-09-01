@@ -11,12 +11,7 @@ import { toJSON, fromJSON } from "./layer.js";
 import { buildWorkbook, readWorkbook, loadExcel } from "./excel.js";
 import { buildMatrixScores, mitigationLevels } from "./scoring.js";
 import { download, slug } from "./ui.js";
-
-/* En-tête des fichiers chiffrés. C'est un identifiant de format, pas une marque :
-   il ne suit pas le renommage du projet en MAPTRIX, sans quoi les évaluations
-   déjà exportées cesseraient d'être reconnues comme chiffrées. Même raison pour
-   `SCHEMA` dans layer.js. */
-const ENCRYPTED_PREFIX = "CTRM1:";
+import { chiffrer, dechiffrer, PREFIXE } from "./crypto.js";
 
 /* ------------------------------------------------------------------ export */
 
@@ -36,14 +31,18 @@ export function exportName(layer) {
     return org ? `${BASE_NAME}-${slug(org)}` : BASE_NAME;
 }
 
-export function exportJSON(layer, passphrase = "") {
-    let payload = toJSON(layer);
-    let suffix = "";
-
-    if (passphrase) {
-        payload = ENCRYPTED_PREFIX + CryptoJS.AES.encrypt(payload, passphrase).toString();
-        suffix = "-chiffre";
-    }
+/**
+ * Écrit le layer en JSON, chiffré si une clé est fournie.
+ *
+ * Asynchrone parce que le chiffrement l'est : dériver la clé coûte quelques
+ * centaines de milliers d'itérations, et c'est précisément ce qui le rend
+ * résistant. L'appelant doit donc l'attendre — et prévenir, l'écriture n'étant
+ * plus instantanée.
+ */
+export async function exportJSON(layer, passphrase = "") {
+    const clair = toJSON(layer);
+    const payload = passphrase ? await chiffrer(clair, passphrase) : clair;
+    const suffix = passphrase ? "-chiffre" : "";
 
     download(`${exportName(layer)}${suffix}.json`, new Blob([payload], { type: "application/json" }));
 }
@@ -86,9 +85,9 @@ export async function readLayerFile(file, passphrase = "") {
 
     let text = (await file.text()).trim();
 
-    if (text.startsWith(ENCRYPTED_PREFIX)) {
+    if (text.startsWith(PREFIXE)) {
         if (!passphrase) throw new Error("ce fichier est chiffré, saisissez la clé de déchiffrement");
-        text = decrypt(text.slice(ENCRYPTED_PREFIX.length), passphrase);
+        text = await dechiffrer(text, passphrase);
     }
 
     try {
@@ -99,25 +98,8 @@ export async function readLayerFile(file, passphrase = "") {
     }
 }
 
-/**
- * Déchiffre, en ramenant tous les échecs à un message unique.
- * Sur une clé erronée, CryptoJS lève « Malformed UTF-8 data » ou rend une
- * chaîne vide selon les octets obtenus : les deux cas veulent dire la même
- * chose pour qui utilise l'outil.
- */
-function decrypt(payload, passphrase) {
-    let clear = "";
-    try {
-        clear = CryptoJS.AES.decrypt(payload, passphrase).toString(CryptoJS.enc.Utf8);
-    } catch {
-        throw new Error("clé de déchiffrement incorrecte");
-    }
-    if (!clear) throw new Error("clé de déchiffrement incorrecte");
-    return clear;
-}
-
 /** Vrai si le fichier attend une clé de déchiffrement. */
 export async function isEncrypted(file) {
     if (!/\.json$/i.test(file.name)) return false;
-    return (await file.slice(0, ENCRYPTED_PREFIX.length).text()) === ENCRYPTED_PREFIX;
+    return (await file.slice(0, PREFIXE.length).text()) === PREFIXE;
 }

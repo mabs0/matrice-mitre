@@ -4,8 +4,8 @@
 
 import { JSDOM } from "jsdom";
 import { readFileSync, readdirSync } from "node:fs";
+import nodeCrypto from "node:crypto";
 import ExcelJS from "exceljs";
-import CryptoJSmod from "crypto-js";
 
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -117,18 +117,35 @@ for (const key of ["window", "document", "HTMLElement", "Node", "Event", "Custom
     }
 }
 
+/* jsdom ne fournit ni `crypto.subtle` ni `btoa`/`atob` sur son window. Ce sont
+   des API standard, présentes dans tous les navigateurs visés, et `js/crypto.js`
+   s'appuie dessus : on complète l'environnement de test plutôt que de tordre le
+   code. WebCrypto vient de node, qui est la même implémentation d'algorithme —
+   ce que le banc vérifie est le format et la logique, pas la primitive. */
+for (const [nom, valeur] of [
+    ["crypto", nodeCrypto.webcrypto],
+    ["btoa", b => Buffer.from(b, "binary").toString("base64")],
+    ["atob", b => Buffer.from(b, "base64").toString("binary")],
+]) {
+    // `window.crypto` n'a qu'un accesseur en lecture dans jsdom : on le
+    // redéfinit, plutôt que d'affecter dessus.
+    // `crypto` n'a qu'un accesseur en lecture, sur le window de jsdom comme sur
+    // le global de node : on le redéfinit, plutôt que d'affecter dessus.
+    for (const cible of [window, globalThis]) {
+        Object.defineProperty(cible, nom, { value: valeur, configurable: true, writable: true });
+    }
+}
+
 globalThis.URL.createObjectURL = () => "blob:fake";
 globalThis.URL.revokeObjectURL = () => {};
 window.matchMedia = () => ({ matches: false, addEventListener() {} });
 window.alert = () => {};
 window.confirm = () => true;
 window.prompt = () => "";
-globalThis.CryptoJS = CryptoJSmod;
 /* `loadExcel()` rend la bibliothèque déjà posée sur `globalThis` sans rien
    demander au réseau : on est alors exactement dans l'état du navigateur après
    son chargement, et le chemin d'import complet devient éprouvable ici. */
 globalThis.ExcelJS = ExcelJS;
-window.CryptoJS = CryptoJSmod;
 
 const fetched = [];
 globalThis.fetch = async (url, opts) => {
@@ -467,8 +484,8 @@ globalThis.Blob = window.Blob = class extends RealBlob {
     constructor(parts, opts) { super(parts, opts); produced = String(parts[0]); }
 };
 
-exportJSON(rebuilt, "cle-de-test");
-ok("le JSON chiffré porte l'en-tête reconnaissable", produced?.startsWith("CTRM1:"),
+await exportJSON(rebuilt, "cle-de-test");
+ok("le JSON chiffré porte l'en-tête reconnaissable", produced?.startsWith("MAPTRIX1:"),
    produced?.slice(0, 12));
 ok("le contenu n'est plus lisible en clair", !produced.includes("Entra ID"));
 
@@ -486,8 +503,62 @@ let noKey = "";
 try { await readLayerFile(encFile, ""); } catch (e) { noKey = e.message; }
 ok("clé manquante signalée", /chiffré/.test(noKey), noKey);
 
+/* --- ce que le chiffrement doit garantir, et pas seulement « ça revient » --- */
+{
+    const { PREFIXE, chiffrer, dechiffrer } = await import(`${ROOT}/js/crypto.js`);
+
+    // Le sel et l'IV sont tirés au sort à chaque export : deux exports du même
+    // layer avec la même clé ne se ressemblent pas. Sans cela, une table
+    // pré-calculée servirait pour tous les fichiers, et comparer deux exports
+    // révélerait qu'ils portent la même évaluation.
+    const a = await chiffrer("le même texte", "la même clé");
+    const b = await chiffrer("le même texte", "la même clé");
+    ok("deux chiffrements du même texte diffèrent", a !== b);
+    ok("et se déchiffrent tous les deux",
+       (await dechiffrer(a, "la même clé")) === "le même texte" &&
+       (await dechiffrer(b, "la même clé")) === "le même texte");
+
+    /* AES-GCM scelle le fichier. Un octet changé en chemin doit faire échouer le
+       déchiffrement, et non rendre une évaluation aux réponses modifiées sans
+       que personne ne s'en aperçoive — c'est ce que faisait le mode précédent,
+       qui brouillait sans authentifier. */
+    const corps = a.slice(PREFIXE.length);
+    const i = Math.floor(corps.length / 2);
+    const altere = PREFIXE + corps.slice(0, i) + (corps[i] === "A" ? "B" : "A") + corps.slice(i + 1);
+    let scelle = "";
+    try { await dechiffrer(altere, "la même clé"); } catch (e) { scelle = e.message; }
+    ok("un fichier modifié en chemin est refusé", scelle !== "", scelle);
+
+    // Un corps tronqué ne doit pas lever une exception technique brute.
+    let tronque = "";
+    try { await dechiffrer(PREFIXE + "AAAA", "la même clé"); } catch (e) { tronque = e.message; }
+    ok("un fichier tronqué donne le même message qu'une mauvaise clé",
+       tronque === "clé de déchiffrement incorrecte", tronque);
+
+    /* Les paramètres sont ce qui fait la solidité : une clé de déchiffrement est
+       une phrase choisie par une personne, donc devinable, et tout l'enjeu est
+       de rendre chaque essai coûteux. 600 000 itérations est la valeur
+       recommandée par l'OWASP pour PBKDF2-HMAC-SHA256. Les baisser ne casserait
+       aucun test de bout en bout — d'où cette vérification directe. */
+    const src = readFileSync(`${ROOT}/js/crypto.js`, "utf8");
+    const iterations = Number(/ITERATIONS = ([\d_]+)/.exec(src)?.[1].replace(/_/g, ""));
+    ok("PBKDF2 tourne au moins 600 000 fois", iterations >= 600_000, String(iterations));
+    ok("la dérivation est en SHA-256, pas en SHA-1", /hash: "SHA-256"/.test(src));
+    ok("le chiffrement est authentifié (AES-GCM)",
+       /name: "AES-GCM"/.test(src) && !/AES-CBC|AES-CTR/.test(src));
+    ok("la clé fait 256 bits", /length: 256/.test(src));
+    ok("le sel fait au moins 16 octets", Number(/TAILLE_SEL = (\d+)/.exec(src)?.[1]) >= 16);
+
+    /* Plus aucune bibliothèque de chiffrement : WebCrypto est fourni par le
+       navigateur, donc rien à télécharger et rien à remplacer en vol. */
+    const sources = ["index.html", ...readdirSync(`${ROOT}/js`).filter(f => f.endsWith(".js")).map(f => `js/${f}`)];
+    const restes = sources.filter(f => /CryptoJS|crypto-js/.test(readFileSync(`${ROOT}/${f}`, "utf8")));
+    ok("aucune bibliothèque de chiffrement n'est chargée depuis un CDN",
+       restes.length === 0, restes.join(", "));
+}
+
 // Export en clair : toujours possible, mais il faut le demander.
-exportJSON(rebuilt, "");
+await exportJSON(rebuilt, "");
 ok("l'export en clair reste ré-importable", produced.includes("Entra ID"));
 globalThis.Blob = window.Blob = RealBlob;
 
@@ -631,15 +702,19 @@ ok("retour en clair", window.document.documentElement.dataset.theme === "light")
 /* ------------------------------------- import chiffré par l'interface */
 
 console.log("\n[16] Import d'un JSON chiffré depuis l'accueil");
+/* Les attentes sont ici bien plus longues qu'ailleurs : déchiffrer demande
+   600 000 itérations de PBKDF2, soit environ 0,15 s. C'est voulu — c'est ce
+   qui rend un fichier volé coûteux à attaquer — et le banc doit laisser le
+   travail se faire au lieu de conclure trop tôt. */
 window.document.getElementById("brand").click();       // confirm renvoie true
 
-const encExport = (() => {
+const encExport = await (async () => {
     let out = null;
     const RB = window.Blob;
     globalThis.Blob = window.Blob = class extends RB {
         constructor(parts, opts) { super(parts, opts); out = String(parts[0]); }
     };
-    exportJSON(partialLayer, "ma-cle");
+    await exportJSON(partialLayer, "ma-cle");
     globalThis.Blob = window.Blob = RB;
     return out;
 })();
@@ -648,14 +723,14 @@ const encDrop = window.document.getElementById("home-drop");
 const encEvent = new window.Event("drop");
 encEvent.dataTransfer = { files: [new window.File([encExport], "chiffre.json", { type: "application/json" })] };
 encDrop.dispatchEvent(encEvent);
-await new Promise(r => setTimeout(r, 60));
+await new Promise(r => setTimeout(r, 900));
 
 ok("une modale demande la clé", !!window.document.getElementById("dec-pass"));
 
 // Mauvaise clé : message dans la modale, qui reste ouverte pour réessayer.
 window.document.getElementById("dec-pass").value = "pas-la-bonne";
 window.document.getElementById("dec-ok").click();
-await new Promise(r => setTimeout(r, 40));
+await new Promise(r => setTimeout(r, 900));
 ok("mauvaise clé signalée sans fermer la modale",
    /incorrecte/.test(window.document.getElementById("dec-error")?.textContent ?? "") &&
    !!window.document.getElementById("dec-pass"),
@@ -664,7 +739,7 @@ ok("mauvaise clé signalée sans fermer la modale",
 // Bonne clé : le layer s'ouvre.
 window.document.getElementById("dec-pass").value = "ma-cle";
 window.document.getElementById("dec-ok").click();
-await new Promise(r => setTimeout(r, 60));
+await new Promise(r => setTimeout(r, 900));
 ok("bonne clé : le layer est chargé",
    window.document.querySelector(".layer-tab .name")?.textContent === "Partiel",
    window.document.querySelector(".layer-tab .name")?.textContent);
@@ -2922,36 +2997,95 @@ console.log("\n[37] Ce qui vient d'un fichier ne devient jamais une clé sans ê
        `${reluMeta.scoring} / ${reluMeta.aggregation}`);
 }
 
-console.log("\n[38] Les bibliothèques du CDN sont vérifiées à la réception");
+console.log("\n[38] Ce qui vient d'un CDN est vérifié à la réception");
 {
-    /* Deux scripts viennent d'un CDN, dans une page qui manipule des évaluations
-       de sécurité et la clé qui les chiffre. Sans empreinte, un CDN compromis ou
-       un intermédiaire qui réécrit le trafic obtient l'exécution du script de son
-       choix, et rien ne le signale. */
     const html = readFileSync(`${ROOT}/index.html`, "utf8");
-    const balises = [...html.matchAll(/<script\b[^>]*\bsrc="(https?:\/\/[^"]+)"[^>]*>/g)];
-    ok("tout script distant du document porte une empreinte",
-       balises.length > 0 && balises.every(([balise]) =>
-           /integrity="sha(256|384|512)-/.test(balise) && /crossorigin=/.test(balise)),
-       balises.map(([b]) => b.slice(0, 60)).join(" | "));
 
-    // Le second est injecté à la demande par excel.js : il doit être vérifié de
-    // la même façon, et `crossorigin` en est la condition — sans lui la réponse
-    // est opaque et l'empreinte ne peut pas être calculée.
+    /* Le document ne charge plus aucun script distant : le chiffrement est passé
+       à WebCrypto, fourni par le navigateur. C'est une chaîne d'approvisionnement
+       de moins sur le chemin critique — il n'y a plus rien à compromettre pour
+       obtenir du code dans une page qui manipule la clé des exports. */
+    const distants = [...html.matchAll(/<script\b[^>]*\bsrc="(https?:\/\/[^"]+)"[^>]*>/g)];
+    ok("le document ne charge aucun script distant au démarrage",
+       distants.length === 0, distants.map(d => d[1]).join(", "));
+
+    /* Reste la bibliothèque Excel, injectée à la demande. Elle porte son
+       empreinte, et `crossorigin` en est la condition : sans lui la réponse est
+       opaque et le contrôle serait silencieusement ignoré. */
     const excelSrc = readFileSync(`${ROOT}/js/excel.js`, "utf8");
-    ok("la bibliothèque Excel chargée à la demande l'est aussi",
+    ok("la bibliothèque Excel chargée à la demande porte son empreinte",
        /s\.integrity\s*=/.test(excelSrc) && /s\.crossOrigin\s*=\s*"anonymous"/.test(excelSrc));
     ok("son empreinte est bien celle de la version demandée",
        /exceljs\/4\.4\.0\//.test(excelSrc) &&
        excelSrc.includes("sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw=="));
+}
 
-    // La version chargée par le navigateur et celle contre laquelle le banc
-    // tourne doivent être la même, sans quoi les essais de chiffrement ne
-    // disent rien du site.
-    const versionBanc = JSON.parse(
-        readFileSync(`${ROOT}/test/node_modules/crypto-js/package.json`, "utf8")).version;
-    ok("le banc chiffre avec la version que la page charge",
-       html.includes(`crypto-js/${versionBanc}/crypto-js.min.js`), versionBanc);
+console.log("\n[38b] Politique de sécurité du contenu");
+{
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] ?? "";
+    ok("le document porte une politique de sécurité", csp !== "");
+
+    const directive = nom =>
+        (new RegExp(`(?:^|;)\\s*${nom}\\s+([^;]*)`).exec(csp)?.[1] ?? "").replace(/\s+/g, " ").trim();
+
+    /* Le cœur de la politique : aucun script en ligne n'est exécuté sans que son
+       contenu exact ait été prévu. C'est cette ligne-là qui arrêterait une
+       injection venue du bundle ATT&CK, d'un fichier de layer ou d'un classeur —
+       les trois entrées par lesquelles du texte étranger circule dans la page. */
+    const scriptSrc = directive("script-src");
+    ok("aucun script en ligne n'est autorisé en bloc", !/'unsafe-inline'/.test(scriptSrc), scriptSrc);
+    ok("aucune évaluation de chaîne n'est autorisée", !/'unsafe-eval'/.test(scriptSrc));
+    ok("le repli par défaut est fermé", directive("default-src") === "'none'", directive("default-src"));
+    ok("les objets et la base d'URL sont fermés",
+       directive("object-src") === "'none'" && directive("base-uri") === "'none'");
+    ok("aucun formulaire ne peut être soumis nulle part", directive("form-action") === "'none'");
+    /* Les données ATT&CK sont la seule destination réseau légitime — et la
+       politique doit désigner exactement l'hôte que le code interroge. Les deux
+       sont écrits à deux endroits différents : si l'un bouge sans l'autre, la
+       page ne charge plus rien et l'erreur ressemble à une panne réseau. */
+    const hote = new URL(/INDEX_URL = "([^"]+)"/.exec(
+        readFileSync(`${ROOT}/js/attack.js`, "utf8"))[1]).origin;
+    ok("le réseau est limité à la source des données",
+       directive("connect-src") === hote, `${directive("connect-src")} / attack.js vise ${hote}`);
+
+    /* Les empreintes sont recalculées ici sur le contenu réel des scripts en
+       ligne. C'est le point qui se périme tout seul : modifier un de ces scripts
+       sans reprendre son empreinte le ferait bloquer par le navigateur, et rien
+       dans le rendu du banc ne le montrerait — la page ne démarre simplement
+       plus. Le calcul est donc refait à chaque exécution. */
+    const enLigne = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    ok("les deux scripts en ligne du document sont connus", enLigne.length === 2, String(enLigne.length));
+    for (const [i, corps] of enLigne.entries()) {
+        const empreinte = "'sha256-" + nodeCrypto.createHash("sha256").update(corps, "utf8").digest("base64") + "'";
+        ok(`l'empreinte du script en ligne ${i + 1} est à jour`,
+           scriptSrc.includes(empreinte),
+           scriptSrc.includes(empreinte) ? "" : `attendue ${empreinte}`);
+    }
+
+    /* `strict-dynamic` est ce qui laisse ces deux scripts poser la carte
+       d'imports, `main.js` et la bibliothèque Excel. Sans lui, il faudrait soit
+       rouvrir `unsafe-inline`, soit renoncer au versionnement des modules. */
+    ok("la confiance est étendue à ce que ces scripts chargent eux-mêmes",
+       /'strict-dynamic'/.test(scriptSrc));
+
+    /* Un gestionnaire écrit en attribut est du script en ligne : la politique le
+       refuse, et une page qui en contient un se casse en silence. */
+    const sources = ["index.html", ...readdirSync(`${ROOT}/js`).filter(f => f.endsWith(".js")).map(f => `js/${f}`),
+                     ...readdirSync(`${ROOT}/js/views`).map(f => `js/views/${f}`)];
+    const fautifs = sources.filter(f =>
+        /\son(click|load|error|change|input|submit|mouseover)\s*=\s*["']/.test(readFileSync(`${ROOT}/${f}`, "utf8")));
+    ok("aucun gestionnaire d'événement n'est écrit dans le markup",
+       fautifs.length === 0, fautifs.join(", "));
+
+    /* Assumé, et dit ici pour que ce soit un choix relu et non un oubli : les
+       mises en forme calculées — largeur d'une barre, périmètre du tracé de la
+       rosace — ne peuvent pas être empreintes puisqu'elles changent à chaque
+       rendu. Le risque est l'exfiltration par sélecteur, sans commune mesure
+       avec l'exécution de script. */
+    ok("les styles en ligne restent autorisés, et c'est documenté",
+       /'unsafe-inline'/.test(directive("style-src")) &&
+       /choix assumé|assumé, pas un oubli/.test(html));
 }
 
 console.log("\n[39] Une adresse venue du bundle n'entre dans un lien qu'après contrôle");
